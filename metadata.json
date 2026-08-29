@@ -1,0 +1,6 @@
+{
+  "name": "Railway Exam Hub",
+  "description": "All RRB Exams, Cut-Offs, Results & More – Complete Information Hub for Indian Railway Recruitment Board exams, notifications, scorecards and answer keys.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
