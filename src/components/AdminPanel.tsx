@@ -99,7 +99,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     else setCurrentTab('home');
   };
 
-  // 17 Navigation Items exactly matching the reference specification
+  // Navigation Items matching the reference specification
   const navItems: { id: AdminMenuTab; label: string; icon: any }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'zones', label: 'RRB Zones', icon: Building2 },

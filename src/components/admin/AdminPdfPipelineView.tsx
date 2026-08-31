@@ -22,7 +22,8 @@ import {
   Trash2,
   Download,
   Search,
-  Filter
+  Filter,
+  Edit3
 } from 'lucide-react';
 import { 
   FullRRBDatabase, 
@@ -108,6 +109,12 @@ export const AdminPdfPipelineView: React.FC<AdminPdfPipelineViewProps> = ({
   const [totalVacancies, setTotalVacancies] = useState<number>(1000);
   const [instructions, setInstructions] = useState('');
 
+  // OCR Text search and active tabs in Verification Step
+  const [activeVerifyTab, setActiveVerifyTab] = useState<'table' | 'form' | 'text'>('table');
+  const [rawTextSearch, setRawTextSearch] = useState('');
+  const [copiedText, setCopiedText] = useState(false);
+  const [manualOcrPaste, setManualOcrPaste] = useState('');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 8 Steps definition
@@ -124,6 +131,48 @@ export const AdminPdfPipelineView: React.FC<AdminPdfPipelineViewProps> = ({
 
   const getStepIndex = (step: PipelineStep) => {
     return pipelineSteps.findIndex((s) => s.id === step);
+  };
+
+  const handleProcessRawText = (text: string, sourceName = 'Pasted_Document_Text.txt') => {
+    if (!text.trim()) {
+      setErrorMessage('Please paste or type text to scan.');
+      return;
+    }
+    setErrorMessage(null);
+    setIsProcessing(true);
+    setCurrentStep('ai_parser');
+    setProcessingStageText('Analyzing raw text, table rows, CEN numbers and score matrices...');
+
+    setTimeout(() => {
+      const analysis = analyzeRrbPdfText(text, sourceName, text.length, 1);
+      setExtractedData(analysis);
+
+      const detected = analysis.detectedType === 'unknown' ? 'cutoff' : analysis.detectedType;
+      setTargetType(detected);
+      setCenNumber(analysis.extractedCen || 'CEN 01/2024');
+      setExamTitle(analysis.extractedExamTitle || 'Railway Recruitment Board Examination');
+      setZoneCode(analysis.extractedZoneCode || 'ALL');
+      setZoneName(analysis.extractedZoneName || 'All Regional RRBs');
+      setPostName(analysis.extractedPostName || 'All Posts');
+      setStage((analysis.extractedStage as CutoffStage) || 'CBT-1');
+
+      if (analysis.extractedCutoffs) {
+        setUrCutoff(analysis.extractedCutoffs.UR !== undefined ? String(analysis.extractedCutoffs.UR) : '75.2');
+        setObcCutoff(analysis.extractedCutoffs.OBC !== undefined ? String(analysis.extractedCutoffs.OBC) : '74.9');
+        setScCutoff(analysis.extractedCutoffs.SC !== undefined ? String(analysis.extractedCutoffs.SC) : '70.3');
+        setStCutoff(analysis.extractedCutoffs.ST !== undefined ? String(analysis.extractedCutoffs.ST) : '68.0');
+        setEwsCutoff(analysis.extractedCutoffs.EWS !== undefined ? String(analysis.extractedCutoffs.EWS) : '74.1');
+        setExsmCutoff(analysis.extractedCutoffs.ExSM !== undefined ? String(analysis.extractedCutoffs.ExSM) : '46.2');
+        setPwbdCutoff(analysis.extractedCutoffs.PwBD !== undefined ? String(analysis.extractedCutoffs.PwBD) : '58.3');
+      }
+
+      if (analysis.extractedRollNumbers && analysis.extractedRollNumbers.length > 0) {
+        setRollNumbersText(analysis.extractedRollNumbers.join(', '));
+      }
+
+      setIsProcessing(false);
+      setCurrentStep('verification');
+    }, 600);
   };
 
   const handleFileSelect = async (file: File) => {
@@ -198,6 +247,51 @@ export const AdminPdfPipelineView: React.FC<AdminPdfPipelineViewProps> = ({
       setErrorMessage(`Failed to process PDF: ${err.message || 'Corrupted or unreadable format'}`);
       setCurrentStep('upload');
     }
+  };
+
+  const handlePublishAllCutoffRows = () => {
+    if (!extractedData || !extractedData.suggestedRecord?.cutoffsList || extractedData.suggestedRecord.cutoffsList.length === 0) {
+      handlePublishToLiveSite();
+      return;
+    }
+
+    const rowsToPublish = extractedData.suggestedRecord.cutoffsList as CutoffRecord[];
+    const updatedDb: FullRRBDatabase = { ...database };
+    const dateStamp = new Date().toISOString();
+
+    const newRecords: CutoffRecord[] = rowsToPublish.map((r, i) => ({
+      ...r,
+      id: `cut-bulk-${Date.now()}-${i}`,
+      pdfReference: pdfFile?.name || r.pdfReference || 'Official Cutoff PDF',
+      updatedAt: dateStamp,
+    }));
+
+    updatedDb.cutoffs = [...newRecords, ...updatedDb.cutoffs];
+    saveRRBDatabase(updatedDb);
+    setDatabase(updatedDb);
+
+    const firstItem = newRecords[0];
+    const publishedMeta = {
+      id: firstItem.id,
+      type: 'cutoff' as const,
+      title: `${newRecords.length} Official Cut-Off Rows (${firstItem.cenNumber})`,
+      cen: firstItem.cenNumber,
+      tab: 'cutoffs' as TabView,
+    };
+
+    setPublishedItem(publishedMeta);
+    setCurrentStep('user_website');
+    onSuccessMessage(`Successfully published ${newRecords.length} cut-off rows to live candidate portal!`);
+
+    dispatchNewDataNotification({
+      title: `📊 ${newRecords.length} Cut-Off Rows Published: ${firstItem.examTitle} (${firstItem.cenNumber})`,
+      message: `${newRecords.length} official category cut-off rows for ${firstItem.zoneName} have been committed to the live candidate portal.`,
+      category: 'cutoff',
+      targetTab: 'cutoffs',
+      targetId: firstItem.id,
+      zoneCode: firstItem.zoneCode,
+      badgeText: 'Cut-Off Table Live',
+    });
   };
 
   const handlePublishToLiveSite = () => {
@@ -485,9 +579,9 @@ export const AdminPdfPipelineView: React.FC<AdminPdfPipelineViewProps> = ({
         </div>
       )}
 
-      {/* STEP 1: PDF UPLOAD */}
+      {/* STEP 1: PDF UPLOAD & OCR TEXT PASTE */}
       {currentStep === 'upload' && !isProcessing && (
-        <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+        <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs space-y-6">
           <div
             onClick={() => fileInputRef.current?.click()}
             className="border-2 border-dashed border-slate-300 hover:border-red-500 bg-slate-50/60 hover:bg-red-50/30 p-10 rounded-2xl text-center cursor-pointer transition-all space-y-3"
@@ -508,7 +602,7 @@ export const AdminPdfPipelineView: React.FC<AdminPdfPipelineViewProps> = ({
             </div>
             <div>
               <h4 className="font-bold text-base text-slate-900">
-                Step 1: Upload Official RRB PDF
+                Option A: Upload Official RRB PDF
               </h4>
               <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
                 Drag & drop CEN Exam Notification, Category-wise Cut-off list, Answer Key circular or Result Merit List PDF.
@@ -516,7 +610,55 @@ export const AdminPdfPipelineView: React.FC<AdminPdfPipelineViewProps> = ({
             </div>
             <div className="inline-flex items-center space-x-1.5 px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-semibold text-slate-600 shadow-xs">
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Full-Stack AI + Heuristics Parser Ready</span>
+              <span>Automatic Multi-Row Cut-Off Table & OCR Scanner Ready</span>
+            </div>
+          </div>
+
+          {/* Option B: Direct Raw Text Paste & Instant Table Scanner */}
+          <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-extrabold text-slate-900 flex items-center space-x-2">
+                <FileText className="w-4 h-4 text-red-600" />
+                <span>Option B: Paste PDF Raw Text & Auto-Scan Table (सीधा टेक्स्ट स्कैन करें)</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setManualOcrPaste(
+`RAILWAY RECRUITMENT BOARD, MALDA
+CEN 06/2025 (NTPC Graduate)
+Cut-off marks for candidates shortlisted for CBAT & CBTST
+
+CAT_NO  UR        SC        ST        OBC       EWS       ESM       R-VI      R-HI      R-LD
+2er     75.21368  70.37037  68.09118  74.92878  74.13793  46.26437
+5er     76.72414  70.37037  65.81197  76.35328  75.00000  44.44444                      58.33333
+5ser    74.71265  70.08547  65.80459  74.64388  74.64388  44.15955  47.57835`
+                  );
+                }}
+                className="text-[11px] font-bold text-red-600 hover:text-red-700 underline cursor-pointer"
+              >
+                Paste Sample Malda Cut-Off Text
+              </button>
+            </div>
+
+            <textarea
+              rows={4}
+              value={manualOcrPaste}
+              onChange={(e) => setManualOcrPaste(e.target.value)}
+              placeholder="Paste raw PDF extracted text or OCR text here (e.g. CAT_NO UR SC ST OBC EWS ESM... 2er 75.21368 70.37037... 5er 76.72414...)"
+              className="w-full p-3 bg-white border border-slate-200 rounded-xl font-mono text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => handleProcessRawText(manualOcrPaste)}
+                disabled={!manualOcrPaste.trim()}
+                className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-bold shadow-xs flex items-center space-x-2 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span>Auto-Scan & Extract Table Matrix</span>
+              </button>
             </div>
           </div>
         </div>
@@ -538,9 +680,9 @@ export const AdminPdfPipelineView: React.FC<AdminPdfPipelineViewProps> = ({
         </div>
       )}
 
-      {/* STEP 5: ADMIN VERIFICATION (Editable Form) */}
+      {/* STEP 5: ADMIN VERIFICATION (Table Matrix & Full Text) */}
       {currentStep === 'verification' && extractedData && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
           {/* Header file stats */}
           <div className="p-4 rounded-xl bg-slate-950 text-white flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center space-x-3">
@@ -559,40 +701,98 @@ export const AdminPdfPipelineView: React.FC<AdminPdfPipelineViewProps> = ({
                   <span className="text-emerald-400 font-bold">{extractedData.confidenceScore}%</span>
                   {' '}• Auto-classified as{' '}
                   <span className="text-amber-400 font-bold uppercase">{extractedData.detectedType}</span>
+                  {extractedData.extractedCutoffRows && extractedData.extractedCutoffRows.length > 0 && (
+                    <span className="text-emerald-300 font-semibold ml-2">
+                      ({extractedData.extractedCutoffRows.length} Table Rows Detected)
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
 
-            <button
-              onClick={() => setViewerOpen(true)}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer"
-            >
-              <Eye className="w-3.5 h-3.5 text-amber-400" />
-              <span>Inspect Raw OCR Text</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              {extractedData.suggestedRecord?.cutoffsList && extractedData.suggestedRecord.cutoffsList.length > 0 && (
+                <button
+                  onClick={handlePublishAllCutoffRows}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center space-x-1.5 transition-all shadow-md cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Publish All {extractedData.suggestedRecord.cutoffsList.length} Rows</span>
+                </button>
+              )}
+              <button
+                onClick={() => setViewerOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer"
+              >
+                <Eye className="w-3.5 h-3.5 text-amber-400" />
+                <span>Modal View</span>
+              </button>
+            </div>
           </div>
 
-          {/* Type Selector Tabs */}
-          <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-            <h4 className="font-bold text-sm text-slate-900 flex items-center space-x-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Step 5: Admin Verification & Data Tuning</span>
-            </h4>
+          {/* Sub-Tabs: Table View, Full Text View, Single Form View */}
+          <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => setActiveVerifyTab('table')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 cursor-pointer transition-all ${
+                  activeVerifyTab === 'table'
+                    ? 'bg-red-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span>Extracted Table Matrix (बढ़िया टेबल)</span>
+                {extractedData.extractedCutoffRows && extractedData.extractedCutoffRows.length > 0 && (
+                  <span className="px-1.5 py-0.2 bg-white/20 rounded-full text-[10px]">
+                    {extractedData.extractedCutoffRows.length}
+                  </span>
+                )}
+              </button>
 
-            <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setActiveVerifyTab('text')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 cursor-pointer transition-all ${
+                  activeVerifyTab === 'text'
+                    ? 'bg-red-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                <span>Full PDF Extracted Text (पूरा टेक्स्ट)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveVerifyTab('form')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 cursor-pointer transition-all ${
+                  activeVerifyTab === 'form'
+                    ? 'bg-red-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <Edit3 className="w-4 h-4" />
+                <span>Single Record Fine-Tuning</span>
+              </button>
+            </div>
+
+            {/* Target type switcher */}
+            <div className="hidden sm:flex items-center space-x-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
               {[
-                { id: 'cutoff', label: 'Cut-Off Record' },
+                { id: 'cutoff', label: 'Cut-Off' },
                 { id: 'result', label: 'Merit Result' },
-                { id: 'notice', label: 'Official Notice' },
+                { id: 'notice', label: 'Notice' },
                 { id: 'exam', label: 'CEN Exam' },
               ].map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setTargetType(t.id as any)}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
                     targetType === t.id
-                      ? 'bg-red-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-white text-slate-900 shadow-xs font-black'
+                      : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
                   {t.label}
@@ -601,134 +801,347 @@ export const AdminPdfPipelineView: React.FC<AdminPdfPipelineViewProps> = ({
             </div>
           </div>
 
-          {/* Form Fields */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">CEN Notification Number</label>
-              <input
-                type="text"
-                value={cenNumber}
-                onChange={(e) => setCenNumber(e.target.value)}
-                placeholder="e.g. CEN 01/2024"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
-              />
-            </div>
+          {/* TAB 1: EXTRACTED CUT-OFF TABLE MATRIX (बढ़िया टेबल) */}
+          {activeVerifyTab === 'table' && (
+            <div className="space-y-4 animate-in fade-in">
+              {extractedData.extractedCutoffRows && extractedData.extractedCutoffRows.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-amber-50/80 rounded-xl border border-amber-200 text-xs">
+                    <div className="flex items-center space-x-2 text-amber-900 font-semibold">
+                      <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>
+                        Found <strong>{extractedData.extractedCutoffRows.length}</strong> official cut-off categories in this PDF. Click any row to populate the editor below, or publish all together!
+                      </span>
+                    </div>
 
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Exam / Recruitment Title</label>
-              <input
-                type="text"
-                value={examTitle}
-                onChange={(e) => setExamTitle(e.target.value)}
-                placeholder="e.g. RRB Assistant Loco Pilot"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Regional Board (Zone)</label>
-              <select
-                value={zoneCode}
-                onChange={(e) => {
-                  const code = e.target.value;
-                  setZoneCode(code);
-                  const matched = OFFICIAL_RRB_ZONES.find((z) => z.code === code);
-                  if (matched) setZoneName(matched.name);
-                }}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500 cursor-pointer"
-              >
-                <option value="ALL">All Regional RRBs (ALL)</option>
-                {OFFICIAL_RRB_ZONES.map((z) => (
-                  <option key={z.id} value={z.code}>
-                    {z.name} ({z.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Post Designation</label>
-              <input
-                type="text"
-                value={postName}
-                onChange={(e) => setPostName(e.target.value)}
-                placeholder="e.g. Technician Gr-III Track Maintainer"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Selection Stage</label>
-              <select
-                value={stage}
-                onChange={(e) => setStage(e.target.value as CutoffStage)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500 cursor-pointer"
-              >
-                <option value="CBT-1">CBT-1 (1st Stage Computer Based Test)</option>
-                <option value="CBT-2 (Part-A)">CBT-2 (Part-A)</option>
-                <option value="CBT-2 (Part-B)">CBT-2 (Part-B Qualifying)</option>
-                <option value="CBAT / Psycho Test">CBAT / Psycho Aptitude Test</option>
-                <option value="Typing Skill Test">Typing Skill Test</option>
-                <option value="Document Verification (DV/Final)">Document Verification (DV/Final)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Recruitment Year</label>
-              <input
-                type="number"
-                value={year}
-                onChange={(e) => setYear(parseInt(e.target.value, 10) || 2025)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
-              />
-            </div>
-          </div>
-
-          {/* Conditional Cutoff Inputs */}
-          {targetType === 'cutoff' && (
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-              <span className="block text-xs font-bold text-slate-800">
-                Extracted Category Cut-Off Scores (Normalized / 100):
-              </span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
-                {[
-                  { label: 'UR (General)', val: urCutoff, setVal: setUrCutoff },
-                  { label: 'OBC (NCL)', val: obcCutoff, setVal: setObcCutoff },
-                  { label: 'SC', val: scCutoff, setVal: setScCutoff },
-                  { label: 'ST', val: stCutoff, setVal: setStCutoff },
-                  { label: 'EWS', val: ewsCutoff, setVal: setEwsCutoff },
-                  { label: 'Ex-SM', val: exsmCutoff, setVal: setExsmCutoff },
-                  { label: 'PwBD', val: pwbdCutoff, setVal: setPwbdCutoff },
-                ].map((cat) => (
-                  <div key={cat.label} className="p-2.5 bg-white rounded-xl border border-slate-200">
-                    <span className="text-[10px] font-bold text-slate-600 block">{cat.label}</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={cat.val}
-                      onChange={(e) => cat.setVal(e.target.value)}
-                      placeholder="Score"
-                      className="w-full mt-1 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900"
-                    />
+                    <button
+                      type="button"
+                      onClick={handlePublishAllCutoffRows}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-xs flex items-center space-x-1.5 cursor-pointer shrink-0"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Publish All {extractedData.extractedCutoffRows.length} Rows</span>
+                    </button>
                   </div>
-                ))}
+
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-900 text-white font-bold">
+                            <th className="py-3 px-3 text-amber-400">CAT_NO</th>
+                            <th className="py-3 px-3">Post Title / Department</th>
+                            <th className="py-3 px-3">Stage</th>
+                            <th className="py-3 px-2 text-center bg-slate-800 text-amber-300">UR</th>
+                            <th className="py-3 px-2 text-center">SC</th>
+                            <th className="py-3 px-2 text-center">ST</th>
+                            <th className="py-3 px-2 text-center">OBC</th>
+                            <th className="py-3 px-2 text-center">EWS</th>
+                            <th className="py-3 px-2 text-center">ESM</th>
+                            <th className="py-3 px-3 text-center text-emerald-300">Special / PwBD</th>
+                            <th className="py-3 px-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 bg-white font-medium text-slate-800">
+                          {extractedData.extractedCutoffRows.map((row, idx) => (
+                            <tr key={row.id || idx} className="hover:bg-slate-50 transition-colors">
+                              <td className="py-3 px-3">
+                                <span className="font-mono font-black text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
+                                  {row.catNo}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 font-semibold text-slate-900">
+                                {row.postTitle}
+                                {row.department && (
+                                  <span className="block text-[11px] text-slate-400 font-normal">
+                                    {row.department}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3 px-3">
+                                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[11px]">
+                                  {row.stage}
+                                </span>
+                              </td>
+                              <td className="py-3 px-2 text-center font-mono font-black text-amber-900 bg-amber-50/50">
+                                {row.cutoffs.UR ?? '--'}
+                              </td>
+                              <td className="py-3 px-2 text-center font-mono font-bold text-slate-800">
+                                {row.cutoffs.SC ?? '--'}
+                              </td>
+                              <td className="py-3 px-2 text-center font-mono font-bold text-slate-800">
+                                {row.cutoffs.ST ?? '--'}
+                              </td>
+                              <td className="py-3 px-2 text-center font-mono font-bold text-slate-800">
+                                {row.cutoffs.OBC ?? '--'}
+                              </td>
+                              <td className="py-3 px-2 text-center font-mono font-bold text-slate-800">
+                                {row.cutoffs.EWS ?? '--'}
+                              </td>
+                              <td className="py-3 px-2 text-center font-mono font-bold text-slate-600">
+                                {row.cutoffs.ExSM ?? '--'}
+                              </td>
+                              <td className="py-3 px-3 text-center">
+                                <div className="flex flex-wrap items-center justify-center gap-1">
+                                  {row.cutoffs['R-LD'] && (
+                                    <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold font-mono">
+                                      R-LD: {row.cutoffs['R-LD']}
+                                    </span>
+                                  )}
+                                  {row.cutoffs['R-VI'] && (
+                                    <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold font-mono">
+                                      R-VI: {row.cutoffs['R-VI']}
+                                    </span>
+                                  )}
+                                  {row.cutoffs.PwBD && !row.cutoffs['R-LD'] && !row.cutoffs['R-VI'] && (
+                                    <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold font-mono">
+                                      PwBD: {row.cutoffs.PwBD}
+                                    </span>
+                                  )}
+                                  {!row.cutoffs['R-LD'] && !row.cutoffs['R-VI'] && !row.cutoffs.PwBD && (
+                                    <span className="text-slate-300">--</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPostName(row.postTitle);
+                                    setStage(row.stage as CutoffStage);
+                                    if (row.cutoffs.UR) setUrCutoff(String(row.cutoffs.UR));
+                                    if (row.cutoffs.OBC) setObcCutoff(String(row.cutoffs.OBC));
+                                    if (row.cutoffs.SC) setScCutoff(String(row.cutoffs.SC));
+                                    if (row.cutoffs.ST) setStCutoff(String(row.cutoffs.ST));
+                                    if (row.cutoffs.EWS) setEwsCutoff(String(row.cutoffs.EWS));
+                                    if (row.cutoffs.ExSM) setExsmCutoff(String(row.cutoffs.ExSM));
+                                    if (row.cutoffs.PwBD) setPwbdCutoff(String(row.cutoffs.PwBD));
+                                    setActiveVerifyTab('form');
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] cursor-pointer"
+                                >
+                                  Load Form
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200">
+                  <BarChart3 className="w-8 h-8 mx-auto text-slate-400 mb-2" />
+                  <p className="font-bold text-slate-800 text-sm">Single Score Summary Detected</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    UR: {urCutoff || '--'}, OBC: {obcCutoff || '--'}, SC: {scCutoff || '--'}, ST: {stCutoff || '--'}, EWS: {ewsCutoff || '--'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveVerifyTab('form')}
+                    className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    Switch to Form Editor
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: FULL EXTRACTED PDF TEXT (पूरा टेक्स्ट) */}
+          {activeVerifyTab === 'text' && (
+            <div className="space-y-3 animate-in fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={rawTextSearch}
+                    onChange={(e) => setRawTextSearch(e.target.value)}
+                    placeholder="Search inside extracted raw text (e.g. 75.21, Malda, Station Master)..."
+                    className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-slate-500">
+                    {extractedData.rawText.length} Characters • {extractedData.totalPages} Page{extractedData.totalPages > 1 ? 's' : ''}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(extractedData.rawText);
+                      setCopiedText(true);
+                      setTimeout(() => setCopiedText(false), 2000);
+                    }}
+                    className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-800 rounded-lg text-xs font-bold flex items-center space-x-1.5 cursor-pointer shadow-2xs"
+                  >
+                    {copiedText ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Copy Full Text</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="max-h-96 overflow-y-auto p-4 bg-slate-950 text-slate-100 rounded-2xl font-mono text-xs leading-relaxed border border-slate-800 whitespace-pre-wrap selection:bg-red-500 selection:text-white">
+                {rawTextSearch ? (
+                  extractedData.rawText.split(new RegExp(`(${rawTextSearch})`, 'gi')).map((part, i) =>
+                    part.toLowerCase() === rawTextSearch.toLowerCase() ? (
+                      <mark key={i} className="bg-amber-400 text-slate-950 font-bold px-1 rounded">
+                        {part}
+                      </mark>
+                    ) : (
+                      part
+                    )
+                  )
+                ) : (
+                  extractedData.rawText
+                )}
               </div>
             </div>
           )}
 
-          {/* Conditional Result / Roll Numbers */}
-          {targetType === 'result' && (
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-              <span className="block text-xs font-bold text-slate-800">
-                Extracted Roll Numbers:
-              </span>
-              <textarea
-                rows={3}
-                value={rollNumbersText}
-                onChange={(e) => setRollNumbersText(e.target.value)}
-                placeholder="Candidate roll numbers separated by comma"
-                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono text-xs text-slate-900"
-              />
+          {/* TAB 3: SINGLE RECORD FORM FIELDS */}
+          {(activeVerifyTab === 'form' || targetType !== 'cutoff') && (
+            <div className="space-y-4 animate-in fade-in">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">CEN Notification Number</label>
+                  <input
+                    type="text"
+                    value={cenNumber}
+                    onChange={(e) => setCenNumber(e.target.value)}
+                    placeholder="e.g. CEN 01/2024"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Exam / Recruitment Title</label>
+                  <input
+                    type="text"
+                    value={examTitle}
+                    onChange={(e) => setExamTitle(e.target.value)}
+                    placeholder="e.g. RRB Assistant Loco Pilot"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Regional Board (Zone)</label>
+                  <select
+                    value={zoneCode}
+                    onChange={(e) => {
+                      const code = e.target.value;
+                      setZoneCode(code);
+                      const matched = OFFICIAL_RRB_ZONES.find((z) => z.code === code);
+                      if (matched) setZoneName(matched.name);
+                    }}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500 cursor-pointer"
+                  >
+                    <option value="ALL">All Regional RRBs (ALL)</option>
+                    {OFFICIAL_RRB_ZONES.map((z) => (
+                      <option key={z.id} value={z.code}>
+                        {z.name} ({z.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Post Designation</label>
+                  <input
+                    type="text"
+                    value={postName}
+                    onChange={(e) => setPostName(e.target.value)}
+                    placeholder="e.g. Technician Gr-III Track Maintainer"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Selection Stage</label>
+                  <select
+                    value={stage}
+                    onChange={(e) => setStage(e.target.value as CutoffStage)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500 cursor-pointer"
+                  >
+                    <option value="CBT-1">CBT-1 (1st Stage Computer Based Test)</option>
+                    <option value="CBT-2 (Part-A)">CBT-2 (Part-A)</option>
+                    <option value="CBT-2 (Part-B)">CBT-2 (Part-B Qualifying)</option>
+                    <option value="CBAT / Psycho Test">CBAT / Psycho Aptitude Test</option>
+                    <option value="Typing Skill Test">Typing Skill Test</option>
+                    <option value="Document Verification (DV/Final)">Document Verification (DV/Final)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Recruitment Year</label>
+                  <input
+                    type="number"
+                    value={year}
+                    onChange={(e) => setYear(parseInt(e.target.value, 10) || 2025)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+              </div>
+
+              {/* Conditional Cutoff Inputs */}
+              {targetType === 'cutoff' && (
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                  <span className="block text-xs font-bold text-slate-800">
+                    Category Cut-Off Scores (Normalized / 100):
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
+                    {[
+                      { label: 'UR (General)', val: urCutoff, setVal: setUrCutoff },
+                      { label: 'OBC (NCL)', val: obcCutoff, setVal: setObcCutoff },
+                      { label: 'SC', val: scCutoff, setVal: setScCutoff },
+                      { label: 'ST', val: stCutoff, setVal: setStCutoff },
+                      { label: 'EWS', val: ewsCutoff, setVal: setEwsCutoff },
+                      { label: 'Ex-SM', val: exsmCutoff, setVal: setExsmCutoff },
+                      { label: 'PwBD', val: pwbdCutoff, setVal: setPwbdCutoff },
+                    ].map((cat) => (
+                      <div key={cat.label} className="p-2.5 bg-white rounded-xl border border-slate-200">
+                        <span className="text-[10px] font-bold text-slate-600 block">{cat.label}</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={cat.val}
+                          onChange={(e) => cat.setVal(e.target.value)}
+                          placeholder="Score"
+                          className="w-full mt-1 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Conditional Result / Roll Numbers */}
+              {targetType === 'result' && (
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                  <span className="block text-xs font-bold text-slate-800">
+                    Extracted Roll Numbers:
+                  </span>
+                  <textarea
+                    rows={3}
+                    value={rollNumbersText}
+                    onChange={(e) => setRollNumbersText(e.target.value)}
+                    placeholder="Candidate roll numbers separated by comma"
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono text-xs text-slate-900"
+                  />
+                </div>
+              )}
             </div>
           )}
 

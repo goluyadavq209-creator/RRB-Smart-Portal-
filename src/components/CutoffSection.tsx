@@ -11,7 +11,9 @@ import {
   Layers,
   FileSpreadsheet,
   Globe,
-  Plus
+  Plus,
+  X,
+  FileText
 } from 'lucide-react';
 import { CutoffRecord, CutoffStage, FullRRBDatabase, TabView } from '../types';
 
@@ -33,6 +35,7 @@ export const CutoffSection: React.FC<CutoffSectionProps> = ({
   const [selectedStageFilter, setSelectedStageFilter] = useState('ALL');
   const [sortField, setSortField] = useState<'UR' | 'postName' | 'zoneName' | 'year'>('UR');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [detailModalItem, setDetailModalItem] = useState<CutoffRecord | null>(null);
 
   // Unique CENs and Stages in existing data
   const availableCens = useMemo(() => {
@@ -371,119 +374,154 @@ export const CutoffSection: React.FC<CutoffSectionProps> = ({
                   <th className="py-3 px-3 text-center">ST</th>
                   <th className="py-3 px-3 text-center">EWS</th>
                   <th className="py-3 px-3 text-center">Ex-SM</th>
+                  <th className="py-3 px-3 text-center text-purple-700">PwBD / Special</th>
                   <th className="py-3 px-3 text-center">Score Type</th>
-                  <th className="py-3 px-3 text-right">PDF Link</th>
+                  <th className="py-3 px-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {filteredCutoffs.map((item, idx) => (
-                  <tr
-                    key={item.id}
-                    className="hover:bg-slate-50/80 transition-colors"
-                  >
-                    {/* Post & CEN */}
-                    <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-950 text-sm leading-snug">
-                        {item.postName}
-                      </div>
-                      <div className="flex items-center space-x-1.5 mt-0.5">
-                        <span className="font-mono text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-semibold border border-slate-200">
-                          {item.cenNumber}
+                {filteredCutoffs.map((item, idx) => {
+                  const specialBadges: { label: string; val: number }[] = [];
+                  if (item.cutoffs['R-LD']) specialBadges.push({ label: 'R-LD', val: item.cutoffs['R-LD'] });
+                  if (item.cutoffs['R-VI']) specialBadges.push({ label: 'R-VI', val: item.cutoffs['R-VI'] });
+                  if (item.cutoffs['R-HI']) specialBadges.push({ label: 'R-HI', val: item.cutoffs['R-HI'] });
+                  if (item.cutoffs['PwBD'] && !item.cutoffs['R-LD'] && !item.cutoffs['R-VI']) {
+                    specialBadges.push({ label: 'PwBD', val: item.cutoffs['PwBD'] });
+                  }
+
+                  return (
+                    <tr
+                      key={item.id}
+                      className="hover:bg-slate-50/80 transition-colors"
+                    >
+                      {/* Post & CEN */}
+                      <td className="py-3 px-4">
+                        <div className="font-semibold text-slate-950 text-sm leading-snug">
+                          {item.postName}
+                        </div>
+                        <div className="flex items-center space-x-1.5 mt-0.5">
+                          <span className="font-mono text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-semibold border border-slate-200">
+                            {item.cenNumber}
+                          </span>
+                          <span className="text-[11px] text-slate-500">{item.examTitle}</span>
+                        </div>
+                      </td>
+
+                      {/* Zone */}
+                      <td className="py-3 px-3">
+                        <div className="font-medium text-slate-800">{item.zoneName}</div>
+                        <span className="text-[10px] font-mono text-slate-400 font-semibold">
+                          {item.zoneCode}
                         </span>
-                        <span className="text-[11px] text-slate-500">{item.examTitle}</span>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Zone */}
-                    <td className="py-3 px-3">
-                      <div className="font-medium text-slate-800">{item.zoneName}</div>
-                      <span className="text-[10px] font-mono text-slate-400 font-semibold">
-                        {item.zoneCode}
-                      </span>
-                    </td>
+                      {/* Stage */}
+                      <td className="py-3 px-3">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium text-[11px]">
+                          {item.stage}
+                        </span>
+                      </td>
 
-                    {/* Stage */}
-                    <td className="py-3 px-3">
-                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium text-[11px]">
-                        {item.stage}
-                      </span>
-                    </td>
+                      {/* UR Score */}
+                      <td className="py-3 px-3 text-center bg-amber-50/40 font-black text-slate-950 text-sm border-x border-amber-100/60">
+                        {item.cutoffs.UR !== undefined ? (
+                          <div className="space-y-0.5">
+                            <span>{item.cutoffs.UR}</span>
+                            {typeof item.cutoffs.UR === 'number' && (
+                              <div className="w-12 mx-auto bg-amber-100 h-1 rounded-full overflow-hidden">
+                                <div
+                                  className="bg-amber-500 h-full rounded-full"
+                                  style={{ width: `${Math.min(100, Math.max(0, item.cutoffs.UR))}%` }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-300">-</span>
+                        )}
+                      </td>
 
-                    {/* UR Score */}
-                    <td className="py-3 px-3 text-center bg-amber-50/40 font-black text-slate-950 text-sm border-x border-amber-100/60">
-                      {item.cutoffs.UR !== undefined ? (
-                        <div className="space-y-0.5">
-                          <span>{item.cutoffs.UR}</span>
-                          {typeof item.cutoffs.UR === 'number' && (
-                            <div className="w-12 mx-auto bg-amber-100 h-1 rounded-full overflow-hidden">
-                              <div
-                                className="bg-amber-500 h-full rounded-full"
-                                style={{ width: `${Math.min(100, Math.max(0, item.cutoffs.UR))}%` }}
-                              />
-                            </div>
+                      {/* OBC */}
+                      <td className="py-3 px-3 text-center font-semibold text-slate-800 text-xs">
+                        {item.cutoffs.OBC ?? <span className="text-slate-300">-</span>}
+                      </td>
+
+                      {/* SC */}
+                      <td className="py-3 px-3 text-center font-semibold text-slate-800 text-xs">
+                        {item.cutoffs.SC ?? <span className="text-slate-300">-</span>}
+                      </td>
+
+                      {/* ST */}
+                      <td className="py-3 px-3 text-center font-semibold text-slate-800 text-xs">
+                        {item.cutoffs.ST ?? <span className="text-slate-300">-</span>}
+                      </td>
+
+                      {/* EWS */}
+                      <td className="py-3 px-3 text-center font-semibold text-slate-800 text-xs">
+                        {item.cutoffs.EWS ?? <span className="text-slate-300">-</span>}
+                      </td>
+
+                      {/* Ex-SM */}
+                      <td className="py-3 px-3 text-center font-medium text-slate-600 text-xs">
+                        {item.cutoffs.ExSM ?? <span className="text-slate-300">-</span>}
+                      </td>
+
+                      {/* Special / PwBD Badges */}
+                      <td className="py-3 px-3 text-center">
+                        {specialBadges.length > 0 ? (
+                          <div className="flex flex-wrap items-center justify-center gap-1">
+                            {specialBadges.map((b) => (
+                              <span
+                                key={b.label}
+                                className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold font-mono"
+                              >
+                                {b.label}: {b.val}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-slate-300 text-xs">-</span>
+                        )}
+                      </td>
+
+                      {/* Score Type */}
+                      <td className="py-3 px-3 text-center">
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
+                            item.normalizedScore
+                              ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {item.normalizedScore ? 'Normalized' : 'Raw Marks'}
+                        </span>
+                      </td>
+
+                      {/* Actions & Detail Modal Trigger */}
+                      <td className="py-3 px-3 text-right">
+                        <div className="flex items-center justify-end space-x-1.5">
+                          <button
+                            onClick={() => setDetailModalItem(item)}
+                            className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] transition-colors cursor-pointer"
+                          >
+                            Details
+                          </button>
+                          {item.pdfReference && (
+                            <a
+                              href={item.pdfReference}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center space-x-0.5 text-blue-600 hover:text-blue-800 font-semibold text-[11px]"
+                            >
+                              <span>PDF</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
                           )}
                         </div>
-                      ) : (
-                        <span className="text-slate-300">-</span>
-                      )}
-                    </td>
-
-                    {/* OBC */}
-                    <td className="py-3 px-3 text-center font-semibold text-slate-800 text-xs">
-                      {item.cutoffs.OBC ?? <span className="text-slate-300">-</span>}
-                    </td>
-
-                    {/* SC */}
-                    <td className="py-3 px-3 text-center font-semibold text-slate-800 text-xs">
-                      {item.cutoffs.SC ?? <span className="text-slate-300">-</span>}
-                    </td>
-
-                    {/* ST */}
-                    <td className="py-3 px-3 text-center font-semibold text-slate-800 text-xs">
-                      {item.cutoffs.ST ?? <span className="text-slate-300">-</span>}
-                    </td>
-
-                    {/* EWS */}
-                    <td className="py-3 px-3 text-center font-semibold text-slate-800 text-xs">
-                      {item.cutoffs.EWS ?? <span className="text-slate-300">-</span>}
-                    </td>
-
-                    {/* Ex-SM */}
-                    <td className="py-3 px-3 text-center font-medium text-slate-600 text-xs">
-                      {item.cutoffs.ExSM ?? <span className="text-slate-300">-</span>}
-                    </td>
-
-                    {/* Score Type */}
-                    <td className="py-3 px-3 text-center">
-                      <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
-                          item.normalizedScore
-                            ? 'bg-blue-50 text-blue-700 border border-blue-100'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {item.normalizedScore ? 'Normalized' : 'Raw Marks'}
-                      </span>
-                    </td>
-
-                    {/* PDF Reference Link */}
-                    <td className="py-3 px-3 text-right">
-                      {item.pdfReference ? (
-                        <a
-                          href={item.pdfReference}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 font-semibold text-[11px]"
-                        >
-                          <span>PDF</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      ) : (
-                        <span className="text-slate-400 text-[10px]">Official</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -494,6 +532,73 @@ export const CutoffSection: React.FC<CutoffSectionProps> = ({
             </div>
             <div className="text-[11px]">
               Note: Cut-off marks are out of 100 or 120 as specified in the respective CEN official prospectus.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DETAIL MODAL FOR FULL CATEGORY BREAKDOWN */}
+      {detailModalItem && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="p-5 bg-slate-950 text-white flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-mono bg-red-600 px-2 py-0.5 rounded font-bold uppercase">
+                  {detailModalItem.cenNumber}
+                </span>
+                <h3 className="font-bold text-base text-white mt-1">
+                  {detailModalItem.postName}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {detailModalItem.zoneName} • {detailModalItem.stage}
+                </p>
+              </div>
+              <button
+                onClick={() => setDetailModalItem(null)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <h4 className="font-bold text-xs uppercase text-slate-500 tracking-wider">
+                Official Category Cut-Off Breakdown
+              </h4>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {Object.entries(detailModalItem.cutoffs).map(([category, score]) => (
+                  <div
+                    key={category}
+                    className={`p-3 rounded-2xl border ${
+                      category === 'UR'
+                        ? 'bg-amber-50 border-amber-200'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <span className="text-[11px] font-bold text-slate-500 block uppercase">
+                      {category}
+                    </span>
+                    <span className="text-base font-black text-slate-900 font-mono">
+                      {score ?? '--'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-xl text-xs text-slate-600 flex items-center justify-between">
+                <span>Score Type: <strong>{detailModalItem.normalizedScore ? 'Normalized Marks' : 'Raw Marks'}</strong></span>
+                <span>Year: <strong>{detailModalItem.year}</strong></span>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-100 border-t border-slate-200 flex justify-end">
+              <button
+                onClick={() => setDetailModalItem(null)}
+                className="px-5 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 cursor-pointer"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

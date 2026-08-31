@@ -1,5 +1,5 @@
 import { CutoffRecord, ExamItem, FullRRBDatabase, NoticeItem, ResultItem, CandidatePortalLink, OFFICIAL_RRB_DIGIALM_LOGIN_URL } from '../types';
-import { INITIAL_EMPTY_DATABASE, OFFICIAL_RRB_ZONES, SAMPLE_TEMPLATE_DATABASE, DEFAULT_CANDIDATE_PORTAL_LINKS } from '../data/defaultData';
+import { INITIAL_EMPTY_DATABASE, OFFICIAL_RRB_ZONES, SAMPLE_TEMPLATE_DATABASE, DEFAULT_CANDIDATE_PORTAL_LINKS, REAL_OFFICIAL_CUTOFFS } from '../data/defaultData';
 
 const STORAGE_KEY = 'rrb_portal_database_clean_v3';
 
@@ -22,7 +22,17 @@ export function loadRRBDatabase(): FullRRBDatabase {
       admitCardUrl: ex?.admitCardUrl || OFFICIAL_RRB_DIGIALM_LOGIN_URL,
       cityIntimationUrl: ex?.cityIntimationUrl || OFFICIAL_RRB_DIGIALM_LOGIN_URL,
     }));
-    const cutoffs = (Array.isArray(parsed.cutoffs) ? parsed.cutoffs : []).filter(Boolean);
+    const loadedCutoffs = (Array.isArray(parsed.cutoffs) ? parsed.cutoffs : []).filter(Boolean);
+    // Ensure official Malda / latest cutoffs exist
+    const cutoffIdSet = new Set(loadedCutoffs.map((c) => c.id));
+    const mergedCutoffs = [...loadedCutoffs];
+    REAL_OFFICIAL_CUTOFFS.forEach((official) => {
+      if (!cutoffIdSet.has(official.id)) {
+        mergedCutoffs.push(official);
+        cutoffIdSet.add(official.id);
+      }
+    });
+
     const notices = (Array.isArray(parsed.notices) ? parsed.notices : []).filter(Boolean);
     const results = (Array.isArray(parsed.results) ? parsed.results : []).filter(Boolean);
     const portalLinks = (Array.isArray(parsed.portalLinks) ? parsed.portalLinks : []).filter(Boolean).map((pl) => ({
@@ -34,7 +44,7 @@ export function loadRRBDatabase(): FullRRBDatabase {
       metadata: parsed.metadata || INITIAL_EMPTY_DATABASE.metadata,
       zones: Array.isArray(parsed.zones) && parsed.zones.length > 0 ? parsed.zones : OFFICIAL_RRB_ZONES,
       exams,
-      cutoffs,
+      cutoffs: mergedCutoffs,
       notices,
       results,
       portalLinks,

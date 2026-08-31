@@ -10,8 +10,9 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ onSuccessMessage
   const [users, setUsers] = useState([
     {
       id: 'u-1',
-      name: 'Super Administrator',
-      email: 'admin@rrb.gov.in',
+      name: 'Maan Singh (Admin)',
+      email: 'ymaan841@gmail.com',
+      mobile: '6393445097',
       role: 'Super Administrator',
       roleBadge: 'bg-red-100 text-red-800 border-red-200',
       status: 'Active',

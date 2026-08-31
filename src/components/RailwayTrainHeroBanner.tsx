@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
-import { Search, Sparkles, Send, ChevronRight, Bot, MessageSquare } from 'lucide-react';
+import { Search, Bell, BarChart3, Trophy, ArrowRight, ShieldCheck, FileText, CheckCircle2 } from 'lucide-react';
+import { TabView } from '../types';
 
 interface RailwayTrainHeroBannerProps {
   onSearchSubmit?: (query: string) => void;
   onSelectTrendingExam?: (examShortCode: string) => void;
-  onOpenAIWithPrompt?: (prompt: string) => void;
+  onNavigateTab?: (tab: TabView) => void;
 }
 
 export const RailwayTrainHeroBanner: React.FC<RailwayTrainHeroBannerProps> = ({
   onSearchSubmit,
   onSelectTrendingExam,
-  onOpenAIWithPrompt,
+  onNavigateTab,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [aiInputText, setAiInputText] = useState('');
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,21 +21,6 @@ export const RailwayTrainHeroBanner: React.FC<RailwayTrainHeroBannerProps> = ({
       onSearchSubmit(searchQuery.trim());
     }
   };
-
-  const handleAISubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (aiInputText.trim() && onOpenAIWithPrompt) {
-      onOpenAIWithPrompt(aiInputText.trim());
-      setAiInputText('');
-    }
-  };
-
-  const aiQuickPrompts = [
-    'RRB Technician का cut-off बताओ',
-    'मेरे marks के हिसाब से analysis करो',
-    'Latest railway vacancy कौन सी है?',
-    'इस exam का syllabus बताओ',
-  ];
 
   const trendingExams = ['RRB NTPC', 'RRB Group D', 'RRB Technician', 'RRB ALP'];
 
@@ -230,68 +215,104 @@ export const RailwayTrainHeroBanner: React.FC<RailwayTrainHeroBannerProps> = ({
             </div>
           </div>
 
-          {/* Right Column (5 cols): Ask RRB AI / आपका AI साथी Widget */}
+          {/* Right Column (5 cols): Official Candidate Services & Highlights */}
           <div className="lg:col-span-5 flex justify-end">
-            <div className="w-full max-w-md bg-[#0b1b3d]/90 backdrop-blur-md rounded-3xl p-5 sm:p-6 border border-blue-500/30 shadow-2xl space-y-4">
-              {/* AI Header with Robot Avatar */}
-              <div className="flex items-center space-x-3 pb-1 border-b border-blue-500/20">
-                {/* Robot Avatar Icon with Cyan Eyes & Glow */}
-                <div className="relative">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center text-white shadow-lg shadow-cyan-500/25 ring-2 ring-cyan-300/40">
-                    <Bot className="w-7 h-7" />
+            <div className="w-full max-w-md bg-[#0b1b3d]/95 backdrop-blur-md rounded-3xl p-5 sm:p-6 border border-blue-500/30 shadow-2xl space-y-4 text-white relative overflow-hidden">
+              <div className="flex items-center justify-between pb-2 border-b border-blue-500/20">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-400 font-bold">
+                    <Bell className="w-5 h-5 text-red-400 animate-pulse" />
                   </div>
-                  {/* Live green/red dot */}
-                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border border-white" />
-                  </span>
+                  <div>
+                    <h3 className="font-extrabold text-sm sm:text-base text-white">
+                      Official RRB Live Updates
+                    </h3>
+                    <p className="text-[11px] text-blue-200">
+                      All 21 Railway Recruitment Boards
+                    </p>
+                  </div>
                 </div>
-
-                <div>
-                  <h3 className="font-black text-base sm:text-lg text-white flex items-center space-x-1.5 leading-tight">
-                    <Sparkles className="w-4 h-4 text-amber-400" />
-                    <span>Ask RRB AI</span>
-                  </h3>
-                  <p className="text-xs text-blue-200 font-medium">
-                    आपका AI साथी
-                  </p>
-                </div>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-400/30">
+                  LIVE
+                </span>
               </div>
 
-              {/* 4 Interactive Quick AI Prompts */}
+              {/* Quick Hub Links */}
               <div className="space-y-2">
-                {aiQuickPrompts.map((prompt, idx) => (
+                {[
+                  {
+                    title: 'Direct Roll Number Check',
+                    sub: 'Instant Result Verification (No Login Required)',
+                    tab: 'roll-check' as const,
+                    icon: CheckCircle2,
+                    badge: 'Instant',
+                    highlight: true,
+                  },
+                  {
+                    title: 'Exam Calendar & Syllabus',
+                    sub: 'NTPC, Group D, ALP & Technician',
+                    tab: 'exams' as const,
+                    icon: FileText,
+                    badge: 'Updated',
+                    highlight: false,
+                  },
+                  {
+                    title: 'Category-Wise Cut-Offs',
+                    sub: 'UR / OBC / SC / ST / EWS Normalized Scores',
+                    tab: 'cutoffs' as const,
+                    icon: BarChart3,
+                    badge: '21 Zones',
+                    highlight: false,
+                  },
+                  {
+                    title: 'CBT Results & Merit Lists',
+                    sub: 'Scorecards & Document Verification Lists',
+                    tab: 'results' as const,
+                    icon: Trophy,
+                    badge: 'Official',
+                    highlight: false,
+                  },
+                ].map((item) => (
                   <button
-                    key={idx}
+                    key={item.title}
                     type="button"
-                    onClick={() => onOpenAIWithPrompt && onOpenAIWithPrompt(prompt)}
-                    className="w-full text-left bg-white/95 hover:bg-white text-slate-900 px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-between transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer group"
+                    onClick={() => onNavigateTab && onNavigateTab(item.tab)}
+                    className={`w-full text-left p-3 rounded-2xl border flex items-center justify-between transition-all hover:scale-[1.01] cursor-pointer group ${
+                      item.highlight 
+                        ? 'bg-blue-600/30 hover:bg-blue-600/45 border-blue-400/50 shadow-sm' 
+                        : 'bg-white/10 hover:bg-white/15 border-white/10'
+                    }`}
                   >
-                    <span className="truncate pr-2">{prompt}</span>
-                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#c1121f] group-hover:translate-x-0.5 transition-all shrink-0" />
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                        item.highlight ? 'bg-blue-500 text-white shadow-xs' : 'bg-blue-500/20 text-blue-300'
+                      }`}>
+                        <item.icon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors flex items-center space-x-1.5">
+                          <span>{item.title}</span>
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                            item.highlight ? 'bg-emerald-500 text-white' : 'bg-red-600/80 text-white'
+                          }`}>
+                            {item.badge}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-300 truncate max-w-[200px]">
+                          {item.sub}
+                        </div>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-amber-300 group-hover:translate-x-1 transition-all shrink-0" />
                   </button>
                 ))}
               </div>
 
-              {/* Bottom AI Input with Purple Airplane Button */}
-              <form onSubmit={handleAISubmit} className="pt-1">
-                <div className="bg-[#132752] rounded-2xl p-1 flex items-center border border-blue-400/30 focus-within:border-cyan-400 transition-colors shadow-inner">
-                  <input
-                    type="text"
-                    value={aiInputText}
-                    onChange={(e) => setAiInputText(e.target.value)}
-                    placeholder="Ask Anything..."
-                    className="w-full bg-transparent px-3 py-1.5 text-xs text-white placeholder:text-blue-200/60 font-medium focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="w-9 h-9 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white flex items-center justify-center transition-all cursor-pointer shrink-0 shadow-md"
-                    title="Send message to RRB AI"
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                </div>
-              </form>
+              {/* Trust Footer */}
+              <div className="pt-1 flex items-center justify-center space-x-1.5 text-[11px] text-slate-400">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Govt. of India • Ministry of Railways Portal</span>
+              </div>
             </div>
           </div>
         </div>

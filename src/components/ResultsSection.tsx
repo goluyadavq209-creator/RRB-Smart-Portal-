@@ -5,24 +5,20 @@ import {
   Filter, 
   FileText, 
   CheckCircle2, 
-  XCircle, 
   Download, 
   ExternalLink, 
   Users, 
   Calendar, 
-  Plus, 
   ArrowRight,
-  Sparkles,
-  SearchCode,
   Sun,
   Copy,
   Check,
   X,
-  ListFilter
+  ListFilter,
+  SearchCode
 } from 'lucide-react';
 import { FullRRBDatabase, ResultItem, ResultType, TabView } from '../types';
 import { PdfViewerModal } from './PdfViewerModal';
-import { DirectRollNumberVerifier } from './DirectRollNumberVerifier';
 
 interface ResultsSectionProps {
   database: FullRRBDatabase;
@@ -43,13 +39,6 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
   const [activeRollModalResult, setActiveRollModalResult] = useState<ResultItem | null>(null);
   const [rollModalSearch, setRollModalSearch] = useState('');
   const [copiedRoll, setCopiedRoll] = useState<string | null>(null);
-  
-  // Roll Number Search State
-  const [rollNumberQuery, setRollNumberQuery] = useState('');
-  const [rollSearchResult, setRollSearchResult] = useState<{
-    searched: boolean;
-    foundIn: { result: ResultItem; roll: string }[];
-  }>({ searched: false, foundIn: [] });
 
   const resultTypes: { label: string; value: string }[] = [
     { label: 'All Results', value: 'ALL' },
@@ -61,7 +50,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
   ];
 
   // Helper to highlight search match in golden morning yellow (सुबह का रंग)
-  const renderHighlightedText = (text: string, query: string, isRollBadge = false) => {
+  const renderHighlightedText = (text: string, query: string) => {
     if (!query || !query.trim()) {
       return <span>{text}</span>;
     }
@@ -93,7 +82,6 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
 
   const filteredResults = database.results.filter((res) => {
     const activeSearch = searchQuery.toLowerCase().trim();
-    const activeRoll = rollNumberQuery.toLowerCase().trim();
 
     const matchesSearch =
       !activeSearch ||
@@ -103,79 +91,32 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
       res.stage.toLowerCase().includes(activeSearch) ||
       (res.rollNumbersSample && res.rollNumbersSample.some((r) => r.toLowerCase().includes(activeSearch)));
 
-    const matchesRollQuery =
-      !activeRoll ||
-      (res.rollNumbersSample && res.rollNumbersSample.some((r) => r.toLowerCase().includes(activeRoll)));
-
     const matchesType = selectedType === 'ALL' || res.type === selectedType;
 
     const matchesZone =
       selectedZoneFilter === 'ALL' || res.zoneCode === selectedZoneFilter;
 
-    return matchesSearch && matchesType && matchesZone && (rollSearchResult.searched ? matchesRollQuery : true);
+    return matchesSearch && matchesType && matchesZone;
   });
-
-  const handleRollSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanRoll = rollNumberQuery.trim();
-    if (!cleanRoll) {
-      setRollSearchResult({ searched: false, foundIn: [] });
-      return;
-    }
-
-    const matches: { result: ResultItem; roll: string }[] = [];
-    database.results.forEach((res) => {
-      if (res.rollNumbersSample && res.rollNumbersSample.length > 0) {
-        const found = res.rollNumbersSample.find(
-          (r) => r.toLowerCase() === cleanRoll.toLowerCase() || r.includes(cleanRoll)
-        );
-        if (found) {
-          matches.push({ result: res, roll: found });
-        }
-      }
-    });
-
-    setRollSearchResult({ searched: true, foundIn: matches });
-  };
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
-        <div>
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-xl bg-purple-50 text-purple-700 border border-purple-100">
-              <Award className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-950">
-                RRB Examination Results & Provisional Panels
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500">
-                Official shortlist merit lists, document verification schedules, and replacement panels
-              </p>
-            </div>
+      {/* Official Results & Merit Lists Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="flex items-center space-x-3">
+          <div className="p-2.5 rounded-xl bg-purple-50 text-purple-700 border border-purple-100">
+            <Award className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold text-slate-950">
+              Official Merit Lists & Provisional Panels
+            </h2>
+            <p className="text-xs text-slate-500">
+              Download official PDF documents, merit lists, and replacement panels
+            </p>
           </div>
         </div>
-
-        <button
-          onClick={() => setCurrentTab('admin')}
-          className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm transition-all shadow-xs self-start sm:self-auto cursor-pointer"
-        >
-          <Plus className="w-4 h-4 text-amber-400" />
-          <span>Upload / Manage Results</span>
-        </button>
       </div>
-
-      {/* Direct Roll Number Verification Tool */}
-      <DirectRollNumberVerifier
-        database={database}
-        onOpenFullPanelModal={(res) => {
-          setActiveRollModalResult(res);
-          setRollModalSearch('');
-        }}
-        setCurrentTab={setCurrentTab}
-      />
 
       {/* Filter and Search Bar */}
       <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
@@ -266,7 +207,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredResults.map((result) => {
-            const activeSearchTerm = searchQuery.trim() || rollNumberQuery.trim();
+            const activeSearchTerm = searchQuery.trim();
             const hasMatchedRoll = Boolean(
               activeSearchTerm &&
               result.rollNumbersSample &&
@@ -348,7 +289,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                           type="button"
                           onClick={() => {
                             setActiveRollModalResult(result);
-                            setRollModalSearch(searchQuery.trim() || rollNumberQuery.trim());
+                            setRollModalSearch(searchQuery.trim());
                           }}
                           className="text-[11px] font-bold text-amber-700 hover:text-amber-900 cursor-pointer flex items-center space-x-0.5"
                         >
@@ -387,7 +328,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                             type="button"
                             onClick={() => {
                               setActiveRollModalResult(result);
-                              setRollModalSearch(searchQuery.trim() || rollNumberQuery.trim());
+                              setRollModalSearch(searchQuery.trim());
                             }}
                             className="text-[10px] font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded border border-slate-200 cursor-pointer transition-colors"
                           >
@@ -407,7 +348,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                       <button
                         onClick={() => {
                           setActiveRollModalResult(result);
-                          setRollModalSearch(searchQuery.trim() || rollNumberQuery.trim());
+                          setRollModalSearch(searchQuery.trim());
                         }}
                         className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold text-xs transition-colors cursor-pointer border border-amber-200"
                       >

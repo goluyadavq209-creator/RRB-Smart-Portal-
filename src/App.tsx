@@ -23,14 +23,14 @@ import { ExamsSection } from './components/ExamsSection';
 import { CutoffSection } from './components/CutoffSection';
 import { NoticesSection } from './components/NoticesSection';
 import { ResultsSection } from './components/ResultsSection';
+import { RollNumberCheckPage } from './components/RollNumberCheckPage';
+import { AnswerCheckPage } from './components/AnswerCheckPage';
 import { AdminPanel } from './components/AdminPanel';
 import { AdminLogin } from './components/AdminLogin';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { NotificationToastContainer } from './components/NotificationToastContainer';
 import { NotificationCenterModal } from './components/NotificationCenterModal';
 import { MobileBottomNav } from './components/MobileBottomNav';
-import { FloatingAIAvatar } from './components/FloatingAIAvatar';
-import { RRBAIAssistantModal } from './components/RRBAIAssistantModal';
 import { RailwayLogo } from './components/RailwayLogo';
 
 export default function App() {
@@ -98,6 +98,88 @@ export default function App() {
 
   const fontSizeClass = fontSize === 'lg' ? 'text-[17px]' : fontSize === 'sm' ? 'text-[14px]' : 'text-[15px]';
 
+  if (currentTab === 'answer-check') {
+    return (
+      <div className={`min-h-screen flex flex-col font-sans ${fontSizeClass}`}>
+        <TopGovBar
+          currentLanguage={language}
+          onLanguageChange={setLanguage}
+          fontSize={fontSize}
+          onFontSizeChange={setFontSize}
+          isDarkMode={isDarkMode}
+          onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+        />
+        <AnswerCheckPage
+          database={database}
+          onNavigateTab={handleNavigate}
+        />
+        {/* Global Universal Search Modal */}
+        <GlobalSearchModal
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          database={database}
+          onNavigate={handleNavigate}
+        />
+        {/* Real-time Notification Center Modal */}
+        <NotificationCenterModal
+          isOpen={isNotificationOpen}
+          onClose={() => setIsNotificationOpen(false)}
+          onNavigate={handleNavigate}
+          zones={database.zones}
+        />
+        {/* Floating Notifications */}
+        <NotificationToastContainer onNavigate={handleNavigate} />
+        {/* Mobile Nav */}
+        <MobileBottomNav
+          currentTab={currentTab}
+          setCurrentTab={handleNavigate}
+          onOpenSearch={() => setIsSearchOpen(true)}
+        />
+      </div>
+    );
+  }
+
+  if (currentTab === 'roll-check') {
+    return (
+      <div className={`min-h-screen flex flex-col font-sans ${fontSizeClass}`}>
+        <TopGovBar
+          currentLanguage={language}
+          onLanguageChange={setLanguage}
+          fontSize={fontSize}
+          onFontSizeChange={setFontSize}
+          isDarkMode={isDarkMode}
+          onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+        />
+        <RollNumberCheckPage
+          database={database}
+          onNavigateTab={handleNavigate}
+        />
+        {/* Global Universal Search Modal */}
+        <GlobalSearchModal
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          database={database}
+          onNavigate={handleNavigate}
+        />
+        {/* Real-time Notification Center Modal */}
+        <NotificationCenterModal
+          isOpen={isNotificationOpen}
+          onClose={() => setIsNotificationOpen(false)}
+          onNavigate={handleNavigate}
+          zones={database.zones}
+        />
+        {/* Floating Notifications */}
+        <NotificationToastContainer onNavigate={handleNavigate} />
+        {/* Mobile Nav */}
+        <MobileBottomNav
+          currentTab={currentTab}
+          setCurrentTab={handleNavigate}
+          onOpenSearch={() => setIsSearchOpen(true)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen bg-[#f4f6f9] flex flex-col font-sans text-slate-900 selection:bg-[#c1121f] selection:text-white ${fontSizeClass}`}>
       {/* 1. Official Government of India Top Header Bar */}
@@ -119,7 +201,6 @@ export default function App() {
         setSelectedZoneFilter={setSelectedZoneFilter}
         onOpenSearch={() => setIsSearchOpen(true)}
         onOpenNotifications={() => setIsNotificationOpen(true)}
-        onOpenAIModal={() => setIsAIModalOpen(true)}
         isAdminAuthenticated={isAdminAuthenticated}
         onAdminLogout={handleAdminLogout}
       />
@@ -133,9 +214,6 @@ export default function App() {
             selectedZoneFilter={selectedZoneFilter}
             setSelectedZoneFilter={setSelectedZoneFilter}
             onOpenGlobalSearch={() => setIsSearchOpen(true)}
-            isAIModalOpen={isAIModalOpen}
-            onCloseAIModal={() => setIsAIModalOpen(false)}
-            onOpenAIModal={() => setIsAIModalOpen(true)}
           />
         )}
 
@@ -209,13 +287,11 @@ export default function App() {
       {/* Floating In-App Live Notification Toasts */}
       <NotificationToastContainer onNavigate={handleNavigate} />
 
-      {/* Floating Bottom-Right RRB AI Avatar Button */}
-      <FloatingAIAvatar onClick={() => setIsAIModalOpen(true)} />
-
-      {/* Global RRB AI Assistant Dialog */}
-      <RRBAIAssistantModal
-        isOpen={isAIModalOpen}
-        onClose={() => setIsAIModalOpen(false)}
+      {/* Mobile Bottom Navigation Bar with Answer Check Master */}
+      <MobileBottomNav
+        currentTab={currentTab}
+        setCurrentTab={handleNavigate}
+        onOpenSearch={() => setIsSearchOpen(true)}
       />
 
       {/* Official Government of India / RRB Footer */}

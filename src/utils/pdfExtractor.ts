@@ -11,6 +11,16 @@ try {
   // Silent fallback
 }
 
+export interface ExtractedCutoffRow {
+  id: string;
+  catNo: string;
+  department?: string; // ER, SER, NR, WR, etc.
+  postTitle: string;
+  stage: CutoffStage | string;
+  cutoffs: CategoryCutoffs;
+  rawTextRow?: string;
+}
+
 export interface ExtractedPdfData {
   fileName: string;
   fileSize: number;
@@ -25,12 +35,14 @@ export interface ExtractedPdfData {
   extractedPostName?: string;
   extractedStage?: CutoffStage | string;
   extractedCutoffs?: CategoryCutoffs;
+  extractedCutoffRows?: ExtractedCutoffRow[];
   extractedRollNumbers?: string[];
   extractedTotalVacancies?: number;
   extractedDates?: string[];
   suggestedRecord?: {
     type: 'cutoff' | 'result' | 'notice' | 'exam';
     cutoff?: Partial<CutoffRecord>;
+    cutoffsList?: Partial<CutoffRecord>[];
     result?: Partial<ResultItem>;
     notice?: Partial<NoticeItem>;
     exam?: Partial<ExamItem>;
@@ -177,6 +189,115 @@ export async function extractTextFromPdf(file: File): Promise<{ fullText: string
   }
 
   return { fullText, totalPages };
+}
+
+/**
+ * Intelligent parser that converts extracted PDF text into structured RRB data models
+ */
+export function extractStructuredCutoffRows(
+  text: string, 
+  defaultStage: string, 
+  cen: string, 
+  zoneCode: string, 
+  zoneName: string, 
+  examTitle: string
+): { rows: ExtractedCutoffRow[]; cutoffsList: CutoffRecord[] } {
+  const rows: ExtractedCutoffRow[] = [];
+  const cutoffsList: CutoffRecord[] = [];
+  
+  // Look for category rows like "2er 75.21368 70.37037 68.09118 74.92878 74.13793 46.26437"
+  const rowPattern = /\b([0-9]{1,2}[a-zA-Z]{0,4})\s+([0-9]{1,2}(?:\.[0-9]+)?)\s+([0-9]{1,2}(?:\.[0-9]+)?)\s+([0-9]{1,2}(?:\.[0-9]+)?)\s+([0-9]{1,2}(?:\.[0-9]+)?)\s+([0-9]{1,2}(?:\.[0-9]+)?)\s+([0-9]{1,2}(?:\.[0-9]+)?)(?:\s+([0-9]{1,2}(?:\.[0-9]+)?))?(?:\s+([0-9]{1,2}(?:\.[0-9]+)?))?/gi;
+  
+  let match;
+  while ((match = rowPattern.exec(text)) !== null) {
+    const rawCat = match[1].toLowerCase();
+    const ur = parseFloat(match[2]);
+    const sc = parseFloat(match[3]);
+    const st = parseFloat(match[4]);
+    const obc = parseFloat(match[5]);
+    const ews = parseFloat(match[6]);
+    const esm = parseFloat(match[7]);
+    const extra1 = match[8] ? parseFloat(match[8]) : undefined;
+    const extra2 = match[9] ? parseFloat(match[9]) : undefined;
+
+    // Filter out false positives (ensure scores are valid 0-100 range)
+    if (ur > 100 || sc > 100 || st > 100 || obc > 100 || ews > 100) continue;
+
+    let dept = '';
+    if (rawCat.includes('ser')) dept = 'SER (South Eastern Railway)';
+    else if (rawCat.includes('er')) dept = 'ER (Eastern Railway)';
+    else if (rawCat.includes('wr')) dept = 'WR (Western Railway)';
+    else if (rawCat.includes('cr')) dept = 'CR (Central Railway)';
+    else if (rawCat.includes('nr')) dept = 'NR (Northern Railway)';
+
+    const catNumberOnly = rawCat.replace(/[^0-9]/g, '');
+    let derivedPost = `Category ${rawCat.toUpperCase()} Post`;
+    if (catNumberOnly === '2') derivedPost = `Category 2 (${dept || 'ER'}) - Station Master / CBAT`;
+    else if (catNumberOnly === '5') derivedPost = `Category 5 (${dept || 'ER/SER'}) - Sr. Clerk Cum Typist / CBTST`;
+    else if (catNumberOnly === '1') derivedPost = `Category 1 (${dept || 'ER'}) - Commercial Apprentice`;
+    else if (catNumberOnly === '3') derivedPost = `Category 3 (${dept || 'ER'}) - Goods Guard / Train Manager`;
+    else if (catNumberOnly === '4') derivedPost = `Category 4 (${dept || 'ER'}) - Jr. Accounts Assistant Cum Typist`;
+
+    // Detect stage for this context from surrounding text
+    const textBefore = text.slice(Math.max(0, match.index - 350), match.index).toLowerCase();
+    let rowStage: CutoffStage = defaultStage as CutoffStage;
+    if (textBefore.includes('cbat') || textBefore.includes('सीबीएटी') || textBefore.includes('psycho') || catNumberOnly === '2') {
+      rowStage = 'CBAT / Psycho Test';
+    } else if (textBefore.includes('cbtst') || textBefore.includes('सीबीटीएसटी') || textBefore.includes('typing') || textBefore.includes('skill') || catNumberOnly === '5') {
+      rowStage = 'Typing Skill Test';
+    }
+
+    const cutoffsObj: CategoryCutoffs = {
+      UR: ur,
+      SC: sc,
+      ST: st,
+      OBC: obc,
+      EWS: ews,
+      ExSM: esm,
+    };
+
+    if (extra1 !== undefined && extra1 < 100) {
+      if (rawCat === '5er') {
+        cutoffsObj['R-LD'] = extra1;
+        cutoffsObj.PwBD = extra1;
+      } else if (rawCat === '5ser') {
+        cutoffsObj['R-VI'] = extra1;
+        cutoffsObj.PwBD = extra1;
+      } else {
+        cutoffsObj.PwBD = extra1;
+      }
+    }
+    if (extra2 !== undefined && extra2 < 100) {
+      cutoffsObj['R-HI'] = extra2;
+    }
+
+    const rowId = `cut-row-${rawCat}-${Date.now().toString(36)}-${rows.length}`;
+    rows.push({
+      id: rowId,
+      catNo: rawCat.toUpperCase(),
+      department: dept,
+      postTitle: derivedPost,
+      stage: rowStage,
+      cutoffs: cutoffsObj,
+      rawTextRow: match[0],
+    });
+
+    cutoffsList.push({
+      id: rowId,
+      cenNumber: cen,
+      examTitle: examTitle,
+      zoneCode: zoneCode,
+      zoneName: zoneName,
+      postName: derivedPost,
+      stage: rowStage,
+      year: new Date().getFullYear(),
+      cutoffs: cutoffsObj,
+      normalizedScore: true,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  return { rows, cutoffsList };
 }
 
 /**
@@ -336,24 +457,46 @@ export function analyzeRrbPdfText(fullText: string, fileName: string, fileSize: 
     }
   }
 
+  // 6. Multi-Row Structured Cut-Off Table Extraction
+  const { rows: extractedCutoffRows, cutoffsList: extractedCutoffsList } = extractStructuredCutoffRows(
+    fullText,
+    extractedStage,
+    extractedCen || 'CEN 01/2024',
+    extractedZoneCode,
+    extractedZoneName,
+    extractedExamTitle
+  );
+
+  // If table rows are found, mark as cutoff type with high confidence
+  if (extractedCutoffRows.length > 0) {
+    detectedType = 'cutoff';
+    confidenceScore = Math.max(confidenceScore, 95);
+  }
+
   // Build suggested records
   const uniqueIdSuffix = Date.now().toString(36);
 
   const suggestedRecord: ExtractedPdfData['suggestedRecord'] = {
     type: detectedType,
+    cutoffsList: extractedCutoffsList.length > 0 ? extractedCutoffsList : undefined,
   };
 
   if (detectedType === 'cutoff') {
+    const primaryRow = extractedCutoffRows[0];
+    const resolvedCutoffs = primaryRow ? primaryRow.cutoffs : (Object.keys(extractedCutoffs).length > 0 ? extractedCutoffs : { UR: 68.5, OBC: 62.0, SC: 54.0, ST: 49.5, EWS: 60.0 });
+    const resolvedPost = primaryRow ? primaryRow.postTitle : extractedPostName;
+    const resolvedStage = primaryRow ? (primaryRow.stage as CutoffStage) : extractedStage;
+
     suggestedRecord.cutoff = {
       id: `cut-extracted-${uniqueIdSuffix}`,
       cenNumber: extractedCen || 'CEN 01/2024',
       examTitle: extractedExamTitle,
       zoneCode: extractedZoneCode,
       zoneName: extractedZoneName,
-      postName: extractedPostName,
-      stage: extractedStage,
+      postName: resolvedPost,
+      stage: resolvedStage,
       year: new Date().getFullYear(),
-      cutoffs: Object.keys(extractedCutoffs).length > 0 ? extractedCutoffs : { UR: 68.5, OBC: 62.0, SC: 54.0, ST: 49.5, EWS: 60.0 },
+      cutoffs: resolvedCutoffs,
       normalizedScore: true,
       pdfReference: fileName,
       updatedAt: new Date().toISOString(),
@@ -421,6 +564,7 @@ export function analyzeRrbPdfText(fullText: string, fileName: string, fileSize: 
     extractedPostName,
     extractedStage,
     extractedCutoffs,
+    extractedCutoffRows,
     extractedRollNumbers,
     extractedTotalVacancies,
     suggestedRecord,

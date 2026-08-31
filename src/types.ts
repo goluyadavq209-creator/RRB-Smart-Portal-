@@ -107,6 +107,19 @@ export type ResultType =
   | 'Final Provisional Panel'
   | 'Replacement Panel';
 
+export interface CandidateScoreRecord {
+  rollNumber: string;
+  name: string;
+  registrationNo: string;
+  rawMarks: number;
+  normalizedScore: number;
+  community: string; // ST, UR, SC, OBC, EWS
+  zonalRank: number;
+  examName?: string;
+  cenNumber?: string;
+  zoneName?: string;
+}
+
 export interface ResultItem {
   id: string;
   cenNumber: string;
@@ -119,6 +132,7 @@ export interface ResultItem {
   fileUrl?: string;
   totalSelectedCandidates?: number;
   rollNumbersSample?: string[];
+  candidateRecords?: CandidateScoreRecord[];
   instructions?: string;
   isNextStageEligible?: boolean;
   nextStageTitle?: string;
@@ -157,6 +171,66 @@ export interface FullRRBDatabase {
   notices: NoticeItem[];
   results: ResultItem[];
   portalLinks?: CandidatePortalLink[];
+  candidateScorecards?: CandidateScoreRecord[];
 }
 
-export type TabView = 'home' | 'exams' | 'cutoffs' | 'notices' | 'results' | 'admin';
+export type QuestionOption = 'Option 1' | 'Option 2' | 'Option 3' | 'Option 4';
+export type StudentOptionChoice = QuestionOption | 'Not Attempted';
+export type QuestionStatus = 'RIGHT' | 'WRONG' | 'UNATTENDED';
+
+export interface ExamScoringSettings {
+  correctMarks: number;
+  negativeMarks: number;
+}
+
+export interface EvaluatedQuestion {
+  questionNumber: number;
+  questionId: string;
+  subject: string;
+  questionText?: string;
+  options?: string[];
+  studentAnswer: StudentOptionChoice;
+  correctAnswer: QuestionOption | 'Unknown';
+  status: QuestionStatus;
+  marks: number;
+  confidenceLow?: boolean;
+}
+
+export interface SubjectBreakdown {
+  subject: string;
+  totalQuestions: number;
+  attempted: number;
+  right: number;
+  wrong: number;
+  unattended: number;
+  accuracy: number;
+  score: number;
+}
+
+export interface FullAnswerEvaluationReport {
+  candidateName: string;
+  rollNumber: string;
+  examName: string;
+  shiftDate: string;
+  settings: ExamScoringSettings;
+  totalQuestions: number;
+  attempted: number;
+  unattempted: number;
+  rightCount: number;
+  wrongCount: number;
+  unattendedCount: number;
+  positiveMarks: number;
+  negativeMarks: number;
+  netScore: number;
+  accuracy: number;
+  predictedNormalizedScore?: number;
+  predictedShiftRank?: number;
+  totalCandidatesInShift?: number;
+  predictedCategoryRank?: number;
+  totalCategoryCandidates?: number;
+  percentile?: number;
+  questions: EvaluatedQuestion[];
+  subjectBreakdown: SubjectBreakdown[];
+}
+
+export type TabView = 'home' | 'roll-check' | 'answer-check' | 'exams' | 'cutoffs' | 'notices' | 'results' | 'admin';
