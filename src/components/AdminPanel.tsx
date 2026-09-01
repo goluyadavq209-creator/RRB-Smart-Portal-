@@ -29,7 +29,6 @@ import {
   CheckCircle2, 
   ExternalLink,
   Layers,
-  DollarSign,
   Monitor,
   Share2,
   BookOpen,
@@ -43,7 +42,6 @@ import { FullRRBDatabase, TabView } from '../types';
 import { logoutAdmin } from '../utils/auth';
 import { RailwayLogo } from './RailwayLogo';
 import { AdminDashboardView } from './admin/AdminDashboardView';
-import { AdminMonetizationView } from './admin/AdminMonetizationView';
 import { AdminPdfPipelineView } from './admin/AdminPdfPipelineView';
 import { AdminZonesView } from './admin/AdminZonesView';
 import { AdminExamsView } from './admin/AdminExamsView';
@@ -73,11 +71,6 @@ export type AdminMenuTab =
   | 'pdf_pipeline'
   | 'mock_test'
   | 'study_material'
-  | 'monetization'
-  | 'monetization_ads'
-  | 'monetization_sponsored'
-  | 'monetization_affiliate'
-  | 'monetization_reports'
   | 'pages'
   | 'subscribers'
   | 'zones'
@@ -104,7 +97,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   setCurrentTab,
   onLogout,
 }) => {
-  const [activeTab, setActiveTab] = useState<AdminMenuTab>('monetization');
+  const [activeTab, setActiveTab] = useState<AdminMenuTab>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -112,7 +105,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Collapsible Sub-menu states
   const [contentMenuOpen, setContentMenuOpen] = useState(false);
   const [examMenuOpen, setExamMenuOpen] = useState(false);
-  const [monetizationMenuOpen, setMonetizationMenuOpen] = useState(true);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -373,93 +365,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <ChevronDown className="w-3.5 h-3.5 opacity-50" />
             </button>
 
-            {/* 10. MONETIZATION (Highlighted Active Dropdown) */}
-            <div className="pt-1">
-              <button
-                onClick={() => {
-                  setMonetizationMenuOpen(!monetizationMenuOpen);
-                  setActiveTab('monetization');
-                }}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all cursor-pointer ${
-                  activeTab.startsWith('monetization')
-                    ? 'bg-blue-600 text-white font-bold shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <div className="flex items-center">
-                  <DollarSign className="w-4 h-4 mr-3 shrink-0 font-black text-amber-300" />
-                  <span>Monetization</span>
-                </div>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${monetizationMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {/* Sub-menu items */}
-              {monetizationMenuOpen && (
-                <div className="pl-9 pr-2 py-1.5 space-y-1 text-[11px] bg-slate-900/60 rounded-xl my-1 border border-slate-800/60">
-                  <button
-                    onClick={() => { setActiveTab('monetization'); setSidebarOpen(false); }}
-                    className={`w-full flex items-center space-x-2 py-1.5 px-2.5 rounded-lg transition-colors cursor-pointer ${
-                      activeTab === 'monetization'
-                        ? 'text-blue-400 font-extrabold bg-blue-950/60'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
-                    }`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${activeTab === 'monetization' ? 'bg-blue-400' : 'bg-slate-500'}`} />
-                    <span>Monetization Dashboard</span>
-                  </button>
-
-                  <button
-                    onClick={() => { setActiveTab('monetization_ads'); setSidebarOpen(false); }}
-                    className={`w-full flex items-center space-x-2 py-1.5 px-2.5 rounded-lg transition-colors cursor-pointer ${
-                      activeTab === 'monetization_ads'
-                        ? 'text-blue-400 font-extrabold bg-blue-950/60'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
-                    }`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                    <span>Ads Management</span>
-                  </button>
-
-                  <button
-                    onClick={() => { setActiveTab('monetization_sponsored'); setSidebarOpen(false); }}
-                    className={`w-full flex items-center space-x-2 py-1.5 px-2.5 rounded-lg transition-colors cursor-pointer ${
-                      activeTab === 'monetization_sponsored'
-                        ? 'text-blue-400 font-extrabold bg-blue-950/60'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
-                    }`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                    <span>Sponsored Posts</span>
-                  </button>
-
-                  <button
-                    onClick={() => { setActiveTab('monetization_affiliate'); setSidebarOpen(false); }}
-                    className={`w-full flex items-center space-x-2 py-1.5 px-2.5 rounded-lg transition-colors cursor-pointer ${
-                      activeTab === 'monetization_affiliate'
-                        ? 'text-blue-400 font-extrabold bg-blue-950/60'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
-                    }`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                    <span>Affiliate Marketing</span>
-                  </button>
-
-                  <button
-                    onClick={() => { setActiveTab('monetization_reports'); setSidebarOpen(false); }}
-                    className={`w-full flex items-center space-x-2 py-1.5 px-2.5 rounded-lg transition-colors cursor-pointer ${
-                      activeTab === 'monetization_reports'
-                        ? 'text-blue-400 font-extrabold bg-blue-950/60'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-800/40'
-                    }`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                    <span>Earnings & Reports</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* 11. Pages */}
+            {/* Pages */}
             <button
               onClick={() => { setActiveTab('pages'); setSidebarOpen(false); }}
               className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-all cursor-pointer ${
@@ -553,10 +459,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             {/* Title / Search */}
             <div className="hidden sm:block">
               <h2 className="text-sm font-extrabold text-slate-900">
-                {activeTab.startsWith('monetization') ? 'Monetization Dashboard' : 'RRB Admin Portal'}
+                RRB Admin Control Portal
               </h2>
               <span className="text-[11px] text-slate-500 font-medium block">
-                {activeTab.startsWith('monetization') ? 'Manage your website earning sources and monetization.' : 'System Overview & Data Operations'}
+                Official Railway Recruitment Board - Centralized Administration & Database System
               </span>
             </div>
           </div>
@@ -627,15 +533,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
         {/* Main Body View Container */}
         <div className="p-4 sm:p-6 lg:p-8 flex-1 max-w-7xl w-full mx-auto">
-          {/* Monetization View */}
-          {activeTab.startsWith('monetization') && (
-            <AdminMonetizationView
-              database={database}
-              setDatabase={setDatabase}
-              onSuccessMessage={showToast}
-            />
-          )}
-
           {activeTab === 'dashboard' && (
             <AdminDashboardView
               database={database}

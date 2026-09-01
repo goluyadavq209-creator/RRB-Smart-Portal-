@@ -1,4 +1,4 @@
-import { FullRRBDatabase, RRBZone, CandidatePortalLink, ExamItem, CutoffRecord, NoticeItem, ResultItem, MonetizationData } from '../types';
+import { FullRRBDatabase, RRBZone, CandidatePortalLink, ExamItem, CutoffRecord, NoticeItem, ResultItem } from '../types';
 import { COMPREHENSIVE_OFFICIAL_CUTOFFS } from './officialCutoffsData';
 
 // 21 Official Regional Railway Recruitment Boards - Verified against https://rrb.indianrailways.gov.in/
@@ -200,163 +200,6 @@ export const REAL_OFFICIAL_EXAMS: ExamItem[] = [];
 // Official Real RRB Cutoffs - Real data from CEN 06/2025 & CEN 01/2024
 export const REAL_OFFICIAL_CUTOFFS: CutoffRecord[] = COMPREHENSIVE_OFFICIAL_CUTOFFS;
 
-// Monetization & Earning Initial State
-export const DEFAULT_MONETIZATION_DATA: MonetizationData = {
-  summary: {
-    todayEarnings: 3245.60,
-    todayGrowth: 12.5,
-    thisMonthEarnings: 48765.30,
-    thisMonthGrowth: 18.7,
-    adEarnings: 19210.40,
-    adGrowth: 15.2,
-    sponsoredEarnings: 18450.00,
-    sponsoredGrowth: 22.4,
-    affiliateEarnings: 11104.90,
-    affiliateGrowth: 11.3,
-    totalEarnings: 48765.30,
-    totalGrowth: 18.7,
-  },
-  adPlacements: [
-    {
-      id: 'ad-1',
-      placement: 'Header Ad (728x90)',
-      adType: 'Google AdSense',
-      adCodeId: 'ca-pub-1234567890123456\nHeader_728x90',
-      status: true,
-      displayOn: 'desktop_mobile',
-      priority: 1,
-      codeSnippet: '<ins class="adsbygoogle" style="display:inline-block;width:728px;height:90px" data-ad-client="ca-pub-1234567890123456" data-ad-slot="1234567890"></ins>',
-    },
-    {
-      id: 'ad-2',
-      placement: 'Home Page Banner (970x250)',
-      adType: 'Google AdSense',
-      adCodeId: 'ca-pub-1234567890123456\nHome_Banner_970x250',
-      status: true,
-      displayOn: 'desktop_mobile',
-      priority: 2,
-      codeSnippet: '<ins class="adsbygoogle" style="display:inline-block;width:970px;height:250px" data-ad-client="ca-pub-1234567890123456" data-ad-slot="2345678901"></ins>',
-    },
-    {
-      id: 'ad-3',
-      placement: 'Result Page Ad (336x280)',
-      adType: 'Google AdSense',
-      adCodeId: 'ca-pub-1234567890123456\nResult_Sidebar_336x280',
-      status: true,
-      displayOn: 'desktop_mobile',
-      priority: 3,
-      codeSnippet: '<ins class="adsbygoogle" style="display:inline-block;width:336px;height:280px" data-ad-client="ca-pub-1234567890123456" data-ad-slot="3456789012"></ins>',
-    },
-    {
-      id: 'ad-4',
-      placement: 'Article Content Ad (In-Content)',
-      adType: 'Media.net',
-      adCodeId: '8CU1234567890123456\nArticle_InContent',
-      status: true,
-      displayOn: 'desktop_mobile',
-      priority: 4,
-      codeSnippet: '<div id="8CU1234567890123456"><script type="text/javascript">window._mNHandle=window._mNHandle||{};window._mNHandle.queue=window._mNHandle.queue||[];</script></div>',
-    },
-    {
-      id: 'ad-5',
-      placement: 'Mobile Sticky Banner (320x50)',
-      adType: 'Google AdSense',
-      adCodeId: 'ca-pub-1234567890123456\nMobile_Sticky_320x50',
-      status: true,
-      displayOn: 'mobile_only',
-      priority: 5,
-      codeSnippet: '<ins class="adsbygoogle" style="display:inline-block;width:320px;height:50px" data-ad-client="ca-pub-1234567890123456" data-ad-slot="4567890123"></ins>',
-    },
-  ],
-  sponsoredPosts: [
-    {
-      id: 'sp-1',
-      title: 'Testbook Pass Pro',
-      company: 'Testbook',
-      duration: '01 Jun – 15 Jun 2025',
-      amount: 5000,
-      status: 'Active',
-      targetUrl: 'https://testbook.com',
-    },
-    {
-      id: 'sp-2',
-      title: 'Rankers Gurukul',
-      company: 'Rankers Gurukul',
-      duration: '25 May – 10 Jun 2025',
-      amount: 4000,
-      status: 'Active',
-      targetUrl: 'https://rankersgurukul.com',
-    },
-    {
-      id: 'sp-3',
-      title: 'Physics Wallah',
-      company: 'PW',
-      duration: '01 Jun – 30 Jun 2025',
-      amount: 7000,
-      status: 'Active',
-      targetUrl: 'https://pw.live',
-    },
-    {
-      id: 'sp-4',
-      title: 'Adda247 Test Series',
-      company: 'Adda247',
-      duration: '20 May – 20 Jun 2025',
-      amount: 6000,
-      status: 'Inactive',
-      targetUrl: 'https://adda247.com',
-    },
-  ],
-  affiliateProducts: [
-    {
-      id: 'aff-1',
-      productName: 'Lucent GK',
-      category: 'General Knowledge',
-      commission: '10%',
-      clicks: 1245,
-      conversions: 86,
-      status: 'Active',
-      affiliateUrl: 'https://amazon.in/dp/example1',
-    },
-    {
-      id: 'aff-2',
-      productName: 'Arihant Railway Maths Book',
-      category: 'Books',
-      commission: '12%',
-      clicks: 986,
-      conversions: 64,
-      status: 'Active',
-      affiliateUrl: 'https://amazon.in/dp/example2',
-    },
-    {
-      id: 'aff-3',
-      productName: 'Testbook Pass Pro',
-      category: 'Test Series',
-      commission: '20%',
-      clicks: 2153,
-      conversions: 185,
-      status: 'Active',
-      affiliateUrl: 'https://testbook.com/affiliate',
-    },
-    {
-      id: 'aff-4',
-      productName: 'Adda247 Railway Batch',
-      category: 'Online Course',
-      commission: '15%',
-      clicks: 1102,
-      conversions: 78,
-      status: 'Active',
-      affiliateUrl: 'https://adda247.com/affiliate',
-    },
-  ],
-  topPagesRevenue: [
-    { page: 'Answer Key Page', revenue: 6245.30, percentage: 100 },
-    { page: 'Result Page', revenue: 4520.10, percentage: 72 },
-    { page: 'Home Page', revenue: 3890.40, percentage: 62 },
-    { page: 'Cut-Off Page', revenue: 2540.20, percentage: 41 },
-    { page: 'Mock Test Page', revenue: 2014.40, percentage: 32 },
-  ],
-};
-
 // Clean Database Slate Ready for Fresh User Updates
 export const INITIAL_EMPTY_DATABASE: FullRRBDatabase = {
   metadata: {
@@ -380,7 +223,6 @@ export const INITIAL_EMPTY_DATABASE: FullRRBDatabase = {
   notices: [],
   results: [],
   portalLinks: [],
-  monetization: DEFAULT_MONETIZATION_DATA,
 };
 
 export const SAMPLE_TEMPLATE_DATABASE: FullRRBDatabase = INITIAL_EMPTY_DATABASE;
