@@ -176,6 +176,131 @@ export interface SiteSettings {
   telegramChannelUrl?: string;
 }
 
+// ----------------------------------------------------
+// TELEGRAM -> AI -> WEBSITE AUTO-PUBLISH SYSTEM TYPES
+// ----------------------------------------------------
+
+export type PostCategory = 
+  | 'Latest News'
+  | 'Exam Update'
+  | 'Admit Card'
+  | 'Answer Key'
+  | 'Result'
+  | 'Cut Off'
+  | 'Vacancy'
+  | 'Recruitment'
+  | 'Government Job'
+  | 'Scholarship'
+  | 'Current Affairs'
+  | 'Education'
+  | 'Important Notice'
+  | 'Other';
+
+export type PostType = 
+  | 'NEWS'
+  | 'RESULT'
+  | 'ADMIT_CARD'
+  | 'ANSWER_KEY'
+  | 'CUT_OFF'
+  | 'VACANCY'
+  | 'NOTICE'
+  | 'ARTICLE'
+  | 'CURRENT_AFFAIRS';
+
+export type TelegramMessageStatus = 
+  | 'RECEIVED'
+  | 'PROCESSING'
+  | 'PROCESSED'
+  | 'PUBLISHED'
+  | 'DRAFT'
+  | 'REJECTED'
+  | 'FAILED'
+  | 'DUPLICATE';
+
+export type PostStatus = 
+  | 'DRAFT'
+  | 'APPROVED'
+  | 'PUBLISHED'
+  | 'REJECTED';
+
+export interface TelegramMessageRecord {
+  id: string;
+  telegram_chat_id: string | number;
+  telegram_message_id: string | number;
+  channel_title?: string;
+  sender_name?: string;
+  message_text: string;
+  caption?: string;
+  media_url?: string;
+  received_at: string;
+  processed_at?: string;
+  status: TelegramMessageStatus;
+  error_message?: string;
+  raw_payload?: any;
+}
+
+export interface PostSeoMetadata {
+  title: string;
+  metaDescription: string;
+  keywords: string[];
+  ogTitle: string;
+  ogDescription: string;
+}
+
+export interface WebsitePost {
+  id: string;
+  telegram_message_id?: string | number;
+  telegram_chat_id?: string | number;
+  category: PostCategory;
+  post_type: PostType;
+  exam: string;
+  title: string;
+  slug: string;
+  summary: string;
+  content: string;
+  important_points: string[];
+  tags: string[];
+  source_text: string;
+  source_url?: string;
+  official_reference?: string;
+  media_url?: string;
+  media_caption?: string;
+  status: PostStatus;
+  confidence: number;
+  published_at?: string;
+  created_at: string;
+  updated_at: string;
+  seo: PostSeoMetadata;
+}
+
+export interface AIProcessingLogRecord {
+  id: string;
+  telegram_message_id: string | number;
+  model: string;
+  prompt: string;
+  response: string;
+  status: 'SUCCESS' | 'FAILED' | 'RECEIVED' | 'PROCESSING';
+  error?: string;
+  created_at: string;
+  execution_time_ms?: number;
+}
+
+export interface TelegramAutoPublishSettings {
+  telegram_enabled: boolean;
+  ai_enabled: boolean;
+  auto_publish: boolean;
+  default_status: 'DRAFT' | 'PUBLISHED';
+  confidence_threshold: number; // e.g., 0.80
+  ai_model: string; // e.g. 'gemini-3.7-flash'
+  bot_token?: string; // Optional configured bot token
+  webhook_secret?: string; // Optional webhook verification secret
+  target_channel_id?: string;
+  auto_create_notices: boolean;
+  auto_create_results: boolean;
+  auto_create_portal_links: boolean;
+  updated_at: string;
+}
+
 export interface FullRRBDatabase {
   metadata: {
     version: string;
@@ -185,6 +310,10 @@ export interface FullRRBDatabase {
     notes?: string;
   };
   settings?: SiteSettings;
+  telegramSettings?: TelegramAutoPublishSettings;
+  telegramMessages?: TelegramMessageRecord[];
+  posts?: WebsitePost[];
+  aiLogs?: AIProcessingLogRecord[];
   zones: RRBZone[];
   exams: ExamItem[];
   cutoffs: CutoffRecord[];

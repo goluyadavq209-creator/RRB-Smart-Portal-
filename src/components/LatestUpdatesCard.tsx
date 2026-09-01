@@ -1,6 +1,7 @@
-import React from 'react';
-import { ArrowRight, ChevronRight } from 'lucide-react';
-import { FullRRBDatabase, TabView } from '../types';
+import React, { useState } from 'react';
+import { ArrowRight, ChevronRight, Sparkles } from 'lucide-react';
+import { FullRRBDatabase, TabView, WebsitePost } from '../types';
+import { PostDetailModal } from './PostDetailModal';
 
 interface LatestUpdatesCardProps {
   database: FullRRBDatabase;
@@ -13,14 +14,28 @@ export const LatestUpdatesCard: React.FC<LatestUpdatesCardProps> = ({
   setCurrentTab,
   onOpenNoticeDetail,
 }) => {
-  // Derive updates dynamically from real database notices & exams
+  const [selectedPost, setSelectedPost] = useState<WebsitePost | null>(null);
+
+  // Derive updates dynamically from real database notices, exams, and published Telegram posts
+  const publishedPosts = (database.posts || []).filter(p => p.status === 'PUBLISHED');
+
   const updates = [
+    ...publishedPosts.map((p) => ({
+      id: `post-${p.id}`,
+      tag: p.category.toUpperCase(),
+      tagColor: p.category === 'Answer Key' ? 'bg-amber-600 text-white' : p.category === 'Result' ? 'bg-emerald-600 text-white' : p.category === 'Admit Card' ? 'bg-blue-600 text-white' : 'bg-indigo-600 text-white',
+      title: p.title,
+      date: new Date(p.published_at || p.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+      post: p,
+      tab: 'notices' as TabView,
+    })),
     ...database.notices.map((n) => ({
       id: n.id,
       tag: n.category === 'Exam Date' ? 'EXAM DATE' : n.category === 'Result & Merit List' ? 'RESULT' : n.category === 'Answer Key & Objections' ? 'ANSWER KEY' : 'NOTICE',
       tagColor: n.category === 'Result & Merit List' ? 'bg-emerald-600 text-white' : n.category === 'Exam Date' ? 'bg-purple-600 text-white' : n.category === 'Answer Key & Objections' ? 'bg-amber-500 text-white' : 'bg-rose-600 text-white',
       title: n.title,
       date: n.publishDate || 'Official',
+      post: null as WebsitePost | null,
       tab: 'notices' as TabView,
     })),
     ...database.cutoffs.map((c) => ({
@@ -29,6 +44,7 @@ export const LatestUpdatesCard: React.FC<LatestUpdatesCardProps> = ({
       tagColor: 'bg-blue-600 text-white',
       title: `${c.examTitle || c.cenNumber} (${c.stage}) - ${c.postName}`,
       date: `${c.year}`,
+      post: null as WebsitePost | null,
       tab: 'cutoffs' as TabView,
     })),
     ...database.results.map((r) => ({
@@ -37,11 +53,16 @@ export const LatestUpdatesCard: React.FC<LatestUpdatesCardProps> = ({
       tagColor: 'bg-emerald-600 text-white',
       title: `${r.examTitle || r.cenNumber} - ${r.type}`,
       date: r.publishDate || 'Official',
+      post: null as WebsitePost | null,
       tab: 'results' as TabView,
     })),
-  ].slice(0, 5);
+  ].slice(0, 6);
 
   const handleClick = (item: (typeof updates)[0]) => {
+    if (item.post) {
+      setSelectedPost(item.post);
+      return;
+    }
     if (onOpenNoticeDetail) {
       onOpenNoticeDetail(item.title);
     }
@@ -50,11 +71,22 @@ export const LatestUpdatesCard: React.FC<LatestUpdatesCardProps> = ({
 
   return (
     <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
+      {/* Post Viewer Modal */}
+      <PostDetailModal post={selectedPost} onClose={() => setSelectedPost(null)} />
+
       {/* Header with View All -> */}
       <div className="flex items-center justify-between">
-        <h3 className="font-extrabold text-base sm:text-lg text-slate-900">
-          Latest Updates
-        </h3>
+        <div className="flex items-center space-x-2">
+          <h3 className="font-extrabold text-base sm:text-lg text-slate-900">
+            Latest Updates & Notices
+          </h3>
+          {publishedPosts.length > 0 && (
+            <span className="hidden sm:inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-100">
+              <Sparkles className="w-3 h-3" />
+              <span>Live Auto-Sync</span>
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => setCurrentTab('notices')}
@@ -86,7 +118,7 @@ export const LatestUpdatesCard: React.FC<LatestUpdatesCardProps> = ({
                 </span>
 
                 {/* Title */}
-                <p className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-[#c1121f] transition-colors truncate">
+                <p className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors truncate">
                   {item.title}
                 </p>
               </div>

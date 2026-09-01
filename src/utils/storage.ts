@@ -49,6 +49,15 @@ export function loadRRBDatabase(): FullRRBDatabase {
 
     const finalDatabase: FullRRBDatabase = {
       metadata: parsed.metadata || INITIAL_EMPTY_DATABASE.metadata,
+      settings: parsed.settings || INITIAL_EMPTY_DATABASE.settings,
+      telegramSettings: parsed.telegramSettings || INITIAL_EMPTY_DATABASE.telegramSettings,
+      telegramMessages: Array.isArray(parsed.telegramMessages) && parsed.telegramMessages.length > 0 
+        ? parsed.telegramMessages 
+        : (INITIAL_EMPTY_DATABASE.telegramMessages || []),
+      posts: Array.isArray(parsed.posts) && parsed.posts.length > 0 
+        ? parsed.posts 
+        : (INITIAL_EMPTY_DATABASE.posts || []),
+      aiLogs: Array.isArray(parsed.aiLogs) ? parsed.aiLogs : (INITIAL_EMPTY_DATABASE.aiLogs || []),
       zones: Array.isArray(parsed.zones) && parsed.zones.length > 0 ? parsed.zones : OFFICIAL_RRB_ZONES,
       exams,
       cutoffs: mergedCutoffs,

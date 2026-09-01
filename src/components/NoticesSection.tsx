@@ -11,10 +11,14 @@ import {
   ArrowRight, 
   Tag,
   CheckCircle2,
-  X
+  X,
+  Sparkles,
+  Send,
+  Radio
 } from 'lucide-react';
-import { FullRRBDatabase, NoticeCategory, NoticeItem, TabView } from '../types';
+import { FullRRBDatabase, NoticeCategory, NoticeItem, TabView, WebsitePost } from '../types';
 import { PdfViewerModal } from './PdfViewerModal';
+import { PostDetailModal } from './PostDetailModal';
 
 interface NoticesSectionProps {
   database: FullRRBDatabase;
@@ -32,10 +36,12 @@ export const NoticesSection: React.FC<NoticesSectionProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [activeNoticeModal, setActiveNoticeModal] = useState<NoticeItem | null>(null);
+  const [activePostModal, setActivePostModal] = useState<WebsitePost | null>(null);
   const [activePdfPreview, setActivePdfPreview] = useState<{ title: string; source: string; text?: string } | null>(null);
 
   const categories: { label: string; value: string }[] = [
-    { label: 'All Categories', value: 'ALL' },
+    { label: 'All Updates & Circulars', value: 'ALL' },
+    { label: '⚡ Telegram AI Updates', value: 'TELEGRAM_POSTS' },
     { label: 'Exam Date', value: 'Exam Date' },
     { label: 'City Slip / Admit Card', value: 'City Intimation / Admit Card' },
     { label: 'Answer Key & Objections', value: 'Answer Key & Objections' },
@@ -45,7 +51,11 @@ export const NoticesSection: React.FC<NoticesSectionProps> = ({
     { label: 'General Advisory', value: 'General Advisory' },
   ];
 
+  const publishedTelegramPosts = (database.posts || []).filter(p => p.status === 'PUBLISHED');
+
   const filteredNotices = database.notices.filter((item) => {
+    if (selectedCategory === 'TELEGRAM_POSTS') return false;
+
     const matchesSearch =
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.cenNumber && item.cenNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -58,6 +68,18 @@ export const NoticesSection: React.FC<NoticesSectionProps> = ({
       selectedZoneFilter === 'ALL' || item.zoneCode === 'ALL' || item.zoneCode === selectedZoneFilter;
 
     return matchesSearch && matchesCategory && matchesZone;
+  });
+
+  const filteredPosts = publishedTelegramPosts.filter((post) => {
+    if (selectedCategory !== 'ALL' && selectedCategory !== 'TELEGRAM_POSTS') return false;
+
+    const matchesSearch =
+      post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.exam.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    return matchesSearch;
   });
 
   const getCategoryBadgeClass = (category: NoticeCategory) => {
@@ -81,6 +103,9 @@ export const NoticesSection: React.FC<NoticesSectionProps> = ({
 
   return (
     <div className="space-y-6 pb-12">
+      {/* Post Viewer Modal */}
+      <PostDetailModal post={activePostModal} onClose={() => setActivePostModal(null)} />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
         <div>
@@ -119,7 +144,7 @@ export const NoticesSection: React.FC<NoticesSectionProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search notices by keyword or CEN..."
-              className="w-full pl-9 pr-3 py-1.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full pl-9 pr-3 py-1.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -128,7 +153,7 @@ export const NoticesSection: React.FC<NoticesSectionProps> = ({
             <select
               value={selectedZoneFilter}
               onChange={(e) => setSelectedZoneFilter(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">All Zones & All-India Notices</option>
               {database.zones.map((z) => (
@@ -149,6 +174,8 @@ export const NoticesSection: React.FC<NoticesSectionProps> = ({
               className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 selectedCategory === cat.value
                   ? 'bg-slate-900 text-white shadow-xs'
+                  : cat.value === 'TELEGRAM_POSTS'
+                  ? 'bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold'
                   : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
               }`}
             >
@@ -158,8 +185,63 @@ export const NoticesSection: React.FC<NoticesSectionProps> = ({
         </div>
       </div>
 
+      {/* Telegram Live AI Articles Grid (if matching) */}
+      {filteredPosts.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center space-x-2">
+            <Radio className="w-4 h-4 text-emerald-500 animate-pulse" />
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
+              Live Real-Time Bulletins (Auto-Published)
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {filteredPosts.map((post) => (
+              <div
+                key={post.id}
+                onClick={() => setActivePostModal(post)}
+                className="bg-gradient-to-br from-white to-slate-50/70 p-5 rounded-2xl border border-blue-100 hover:border-blue-300 shadow-xs hover:shadow-md transition-all cursor-pointer space-y-2.5 group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                      {post.category}
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-500">
+                      {post.exam}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    {new Date(post.published_at || post.created_at).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                    })}
+                  </span>
+                </div>
+
+                <h4 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-snug line-clamp-2">
+                  {post.title}
+                </h4>
+
+                <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                  {post.summary}
+                </p>
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100/80 text-xs font-bold text-blue-600">
+                  <span className="flex items-center space-x-1">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                    <span className="text-slate-500 font-medium text-[11px]">Click to Read Full Analysis</span>
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Notices Feed List */}
-      {filteredNotices.length === 0 ? (
+      {filteredNotices.length === 0 && filteredPosts.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-2xl border border-dashed border-slate-200">
           <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center mx-auto mb-3">
             <Bell className="w-7 h-7" />
@@ -199,74 +281,52 @@ export const NoticesSection: React.FC<NoticesSectionProps> = ({
           {filteredNotices.map((notice) => (
             <div
               key={notice.id}
-              className={`p-5 rounded-2xl bg-white border transition-all hover:shadow-sm flex flex-col sm:flex-row sm:items-start justify-between gap-4 ${
-                notice.isImportant
-                  ? 'border-amber-300 bg-amber-50/20 ring-1 ring-amber-300'
-                  : 'border-slate-200'
-              }`}
+              className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs hover:border-slate-300 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
             >
-              <div className="space-y-2">
-                {/* Badges Bar */}
+              <div className="space-y-1.5 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  {notice.isNew && (
-                    <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-rose-600 text-white">
-                      NEW
-                    </span>
-                  )}
-                  {notice.isImportant && (
-                    <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-amber-50 text-amber-900 border border-amber-200">
-                      IMPORTANT
-                    </span>
-                  )}
                   <span
-                    className={`px-2.5 py-0.5 text-[11px] font-semibold uppercase rounded border ${getCategoryBadgeClass(
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold border ${getCategoryBadgeClass(
                       notice.category
                     )}`}
                   >
                     {notice.category}
                   </span>
-
                   {notice.cenNumber && (
-                    <span className="px-2 py-0.5 font-mono text-[11px] font-medium bg-slate-100 text-slate-800 rounded border border-slate-200">
+                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] sm:text-xs font-semibold">
                       {notice.cenNumber}
                     </span>
                   )}
-
-                  <span className="text-xs text-slate-400 flex items-center space-x-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span>{notice.publishDate}</span>
+                  <span className="text-[10px] sm:text-xs text-slate-400">
+                    Zone: {notice.zoneCode}
                   </span>
-
-                  <span className="text-[11px] font-medium text-slate-500">
-                    • Zone:{' '}
-                    {notice.zoneCode === 'ALL'
-                      ? 'All RRBs'
-                      : database.zones.find((z) => z.code === notice.zoneCode)?.name || notice.zoneCode}
+                  <span className="text-slate-300">•</span>
+                  <span className="text-[10px] sm:text-xs text-slate-400">
+                    {notice.publishDate}
                   </span>
                 </div>
 
-                {/* Title */}
-                <h3 className="font-bold text-base text-slate-900 leading-snug">
+                <h3
+                  onClick={() => setActiveNoticeModal(notice)}
+                  className="font-bold text-slate-900 hover:text-blue-600 text-sm sm:text-base cursor-pointer transition-colors"
+                >
                   {notice.title}
                 </h3>
 
-                {/* Summary */}
                 {notice.contentSummary && (
-                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-3xl">
+                  <p className="text-xs text-slate-500 line-clamp-2">
                     {notice.contentSummary}
                   </p>
                 )}
               </div>
 
-              {/* Action Buttons */}
-              <div className="shrink-0 flex sm:flex-col items-center sm:items-end gap-2 pt-2 sm:pt-0">
+              <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center">
                 <button
                   onClick={() => setActiveNoticeModal(notice)}
-                  className="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition-colors cursor-pointer"
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition-colors cursor-pointer"
                 >
-                  View Details
+                  View Notice
                 </button>
-
                 {notice.pdfUrl && (
                   <button
                     onClick={() =>
@@ -276,10 +336,10 @@ export const NoticesSection: React.FC<NoticesSectionProps> = ({
                         text: notice.contentSummary,
                       })
                     }
-                    className="inline-flex items-center space-x-1 text-xs font-semibold text-purple-600 hover:text-purple-800 cursor-pointer"
+                    className="p-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors cursor-pointer"
+                    title="Preview Circular PDF"
                   >
-                    <FileText className="w-3 h-3" />
-                    <span>Preview Document</span>
+                    <FileText className="w-4 h-4" />
                   </button>
                 )}
               </div>
@@ -288,35 +348,37 @@ export const NoticesSection: React.FC<NoticesSectionProps> = ({
         </div>
       )}
 
-      {/* Notice Detail View Modal */}
+      {/* Notice Detail Modal */}
       {activeNoticeModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div 
-            className="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-5 bg-white border-b border-slate-200 text-slate-900 flex items-start justify-between">
-              <div>
-                <span className="text-xs font-mono font-bold bg-amber-50 text-amber-900 border border-amber-200 px-2 py-0.5 rounded-md">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center space-x-2">
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${getCategoryBadgeClass(
+                    activeNoticeModal.category
+                  )}`}
+                >
                   {activeNoticeModal.category}
                 </span>
-                <h3 className="font-bold text-base text-slate-950 mt-2">
-                  {activeNoticeModal.title}
-                </h3>
+                <span className="text-xs text-slate-500">
+                  {activeNoticeModal.publishDate}
+                </span>
               </div>
               <button
                 onClick={() => setActiveNoticeModal(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+                className="p-1 text-slate-400 hover:text-slate-800 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-4 text-sm text-slate-700">
-              <div className="flex flex-wrap gap-4 text-xs text-slate-500 pb-3 border-b border-slate-100">
-                <div>
-                  <strong>Published:</strong> {activeNoticeModal.publishDate}
-                </div>
+            <div className="p-6 space-y-4">
+              <h3 className="font-extrabold text-slate-950 text-base sm:text-lg leading-snug">
+                {activeNoticeModal.title}
+              </h3>
+
+              <div className="flex flex-wrap gap-4 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
                 <div>
                   <strong>CEN:</strong> {activeNoticeModal.cenNumber || 'General'}
                 </div>
