@@ -14,7 +14,7 @@ import {
   Bot
 } from 'lucide-react';
 import { FullRRBDatabase, TabView } from './types';
-import { loadRRBDatabase, saveRRBDatabase, exportEmptySchemaJson } from './utils/storage';
+import { loadRRBDatabase, saveRRBDatabase, exportEmptySchemaJson, fetchServerDatabase, subscribeToLiveDatabase } from './utils/storage';
 import { checkAdminSession, logoutAdmin } from './utils/auth';
 import { TopGovBar } from './components/TopGovBar';
 import { Navbar } from './components/Navbar';
@@ -41,7 +41,7 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(true);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => checkAdminSession());
   const [language, setLanguage] = useState<'hi' | 'en'>('hi');
   const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('base');
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -50,6 +50,23 @@ export default function App() {
   useEffect(() => {
     saveRRBDatabase(database);
   }, [database]);
+
+  // Initial fetch from central server + real-time push subscription across all devices
+  useEffect(() => {
+    // 1. Initial fetch from server
+    fetchServerDatabase().then((serverDb) => {
+      if (serverDb) {
+        setDatabase(serverDb);
+      }
+    });
+
+    // 2. Real-time live multi-device update subscription
+    const unsubscribe = subscribeToLiveDatabase((updatedDb) => {
+      setDatabase(updatedDb);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Support direct URL hash (#admin) or query parameter (?admin) for administrator access
   useEffect(() => {

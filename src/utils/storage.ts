@@ -76,6 +76,24 @@ export function loadRRBDatabase(): FullRRBDatabase {
   }
 }
 
+let lastKnownServerVersion = 0;
+
+export async function fetchServerDatabase(): Promise<FullRRBDatabase | null> {
+  try {
+    const res = await fetch('/api/database');
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json.success && json.database) {
+      if (json.version) lastKnownServerVersion = json.version;
+      return json.database as FullRRBDatabase;
+    }
+    return null;
+  } catch (err) {
+    console.warn('Could not reach central database API, using local vault:', err);
+    return null;
+  }
+}
+
 export function saveRRBDatabase(data: FullRRBDatabase): boolean {
   try {
     const dataToSave: FullRRBDatabase = {
@@ -93,11 +111,97 @@ export function saveRRBDatabase(data: FullRRBDatabase): boolean {
       console.warn('1TB IndexedDB background sync warning:', err);
     });
 
+    // Synchronize to Server so all devices receive the update in real-time
+    fetch('/api/database/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dataToSave),
+    })
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.version) lastKnownServerVersion = res.version;
+      })
+      .catch((err) => {
+        console.warn('Background server sync warning:', err);
+      });
+
     return true;
   } catch (err) {
     console.error('Failed to save RRB database:', err);
     return false;
   }
+}
+
+// Subscribe to real-time live database updates across all devices (SSE + Fallback Polling)
+export function subscribeToLiveDatabase(onUpdate: (db: FullRRBDatabase) => void): () => void {
+  let isCancelled = false;
+  let eventSource: EventSource | null = null;
+  let pollTimer: any = null;
+
+  // 1. Establish Server-Sent Events (SSE) stream for instantaneous push
+  try {
+    if (typeof window !== 'undefined' && typeof EventSource !== 'undefined') {
+      eventSource = new EventSource('/api/database/events');
+      
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'DATABASE_UPDATED' && payload.version) {
+            if (payload.version !== lastKnownServerVersion) {
+              lastKnownServerVersion = payload.version;
+              fetchServerDatabase().then((db) => {
+                if (db && !isCancelled) {
+                  onUpdate(db);
+                }
+              });
+            }
+          }
+        } catch {
+          // ignore parsing error
+        }
+      };
+
+      eventSource.onerror = () => {
+        // SSE error, will auto-reconnect or rely on fast version polling
+      };
+    }
+  } catch {
+    // SSE fallback
+  }
+
+  // 2. Fast fallback Polling (every 2.5s) to guarantee updates on every network condition
+  const checkVersion = async () => {
+    if (isCancelled) return;
+    try {
+      const res = await fetch('/api/database/version');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.version && data.version !== lastKnownServerVersion) {
+          lastKnownServerVersion = data.version;
+          const freshDb = await fetchServerDatabase();
+          if (freshDb && !isCancelled) {
+            onUpdate(freshDb);
+          }
+        }
+      }
+    } catch {
+      // ignore transient network glitch
+    }
+  };
+
+  pollTimer = setInterval(checkVersion, 2500);
+
+  return () => {
+    isCancelled = true;
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  };
 }
 
 export function clearRRBDatabase(): FullRRBDatabase {

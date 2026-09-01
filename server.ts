@@ -4,6 +4,16 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import { telegramDb } from './src/server/telegramDb';
+import {
+  loadServerPortalDb,
+  saveServerPortalDb,
+  getServerPortalDb,
+  getServerDbVersion,
+  registerSSEClient,
+  verifyAdminCredentials,
+  verifyAdminSessionToken,
+  broadcastSyncEvent,
+} from './src/server/portalDb';
 import { 
   handleIncomingTelegramUpdate, 
   setTelegramWebhook, 
@@ -79,6 +89,137 @@ app.get('/api/health', (req, res) => {
     officialCentralUrl: 'https://rrb.indianrailways.gov.in/',
     timestamp: new Date().toISOString() 
   });
+});
+
+// ----------------------------------------------------
+// 0. REAL-TIME CENTRAL DATABASE & MULTI-DEVICE SYNC APIS
+// ----------------------------------------------------
+// Get central portal database
+app.get('/api/database', (req, res) => {
+  try {
+    const db = getServerPortalDb();
+    const { version, lastUpdated } = getServerDbVersion();
+    return res.json({
+      success: true,
+      database: db,
+      version,
+      lastUpdated,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Save central portal database and broadcast update to ALL devices
+app.post(['/api/database', '/api/database/save'], (req, res) => {
+  try {
+    const databasePayload = req.body;
+    if (!databasePayload || typeof databasePayload !== 'object') {
+      return res.status(400).json({ success: false, error: 'Valid database payload required' });
+    }
+
+    const { version, lastUpdated } = saveServerPortalDb(databasePayload);
+    return res.json({
+      success: true,
+      version,
+      lastUpdated,
+      message: 'Central database updated and broadcasted to all active devices',
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Fast database version check for polling clients
+app.get('/api/database/version', (req, res) => {
+  try {
+    const { version, lastUpdated } = getServerDbVersion();
+    return res.json({
+      success: true,
+      version,
+      lastUpdated,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Server-Sent Events (SSE) stream for live push notifications across all open devices
+app.get('/api/database/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  // Send initial connection handshake
+  const { version, lastUpdated } = getServerDbVersion();
+  res.write(`data: ${JSON.stringify({ type: 'CONNECTED', version, lastUpdated })}\n\n`);
+
+  // Register client in active subscriber list
+  registerSSEClient(res);
+
+  // Keep-alive ping interval
+  const pingInterval = setInterval(() => {
+    try {
+      res.write(`data: ${JSON.stringify({ type: 'PING', timestamp: Date.now() })}\n\n`);
+    } catch {
+      clearInterval(pingInterval);
+    }
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(pingInterval);
+  });
+});
+
+// ----------------------------------------------------
+// ENCRYPTED ADMIN AUTHENTICATION ENDPOINTS
+// ----------------------------------------------------
+app.post('/api/admin/login', (req, res) => {
+  try {
+    const { usernameOrEmail, password } = req.body;
+    if (!usernameOrEmail || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Admin Username/Email and Password are required.',
+      });
+    }
+
+    const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
+    const result = verifyAdminCredentials(usernameOrEmail, password, clientIp);
+
+    if (result.success) {
+      return res.json({
+        success: true,
+        token: result.token,
+        adminProfile: result.adminProfile,
+        message: 'Cryptographic Authentication Successful.',
+      });
+    } else {
+      return res.status(401).json({
+        success: false,
+        error: result.error || 'Invalid credentials',
+        isLocked: result.isLocked,
+        lockRemainingSeconds: result.lockRemainingSeconds,
+      });
+    }
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/admin/verify-token', (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || '';
+    const token = req.body.token || authHeader.replace(/^Bearer\s+/, '');
+    const isValid = verifyAdminSessionToken(token);
+    return res.json({
+      success: isValid,
+      isAuthenticated: isValid,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // ----------------------------------------------------

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, 
   Lock, 
@@ -9,9 +9,11 @@ import {
   AlertCircle, 
   CheckCircle2,
   ArrowRight,
-  Shield
+  Shield,
+  KeyRound,
+  Fingerprint
 } from 'lucide-react';
-import { loginAdmin } from '../utils/auth';
+import { loginAdminAsync, sha256Hex } from '../utils/auth';
 
 interface AdminLoginProps {
   onSuccess: () => void;
@@ -23,42 +25,68 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, onCancel }) =
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   // Status State
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [lockCountdown, setLockCountdown] = useState<number | null>(null);
 
-  // Submit Handler
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (lockCountdown && lockCountdown > 0) {
+      const timer = setInterval(() => {
+        setLockCountdown((prev) => {
+          if (prev && prev > 1) return prev - 1;
+          clearInterval(timer);
+          return null;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [lockCountdown]);
+
+  // Submit Handler with 256-bit Cryptographic Handshake
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
+
+    if (lockCountdown && lockCountdown > 0) {
+      setErrorMsg(`Access temporarily locked for security. Please wait ${lockCountdown}s.`);
+      return;
+    }
 
     const cleanUser = usernameOrEmail.trim();
     const cleanPass = password.trim();
 
     if (!cleanUser) {
-      setErrorMsg('Please enter your Admin Username or Email ID.');
+      setErrorMsg('Please enter your Master Admin Username or Email ID.');
       return;
     }
     if (!cleanPass) {
-      setErrorMsg('Please enter your Admin Password.');
+      setErrorMsg('Please enter your Encrypted Admin Password.');
       return;
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      const success = loginAdmin(cleanUser, cleanPass, rememberMe);
+    try {
+      const result = await loginAdminAsync(cleanUser, cleanPass, rememberMe);
       setIsLoading(false);
-      if (success) {
-        setSuccessMsg('Authentication Successful! Redirecting to Admin Dashboard...');
+
+      if (result.success) {
+        setSuccessMsg('256-Bit Cryptographic Handshake Verified! Access Granted.');
         setTimeout(() => onSuccess(), 250);
       } else {
-        setErrorMsg('Invalid Username / Email or Password. Please check your credentials.');
+        if (result.isLocked && result.lockRemainingSeconds) {
+          setLockCountdown(result.lockRemainingSeconds);
+        }
+        setErrorMsg(result.error || 'Access Denied: Invalid Master Administrator Credentials.');
       }
-    }, 250);
+    } catch {
+      setIsLoading(false);
+      setErrorMsg('Cryptographic authorization server unreachable. Please retry.');
+    }
   };
 
   return (
@@ -106,35 +134,39 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, onCancel }) =
               </div>
             </div>
 
-            {/* Big Typography matching screenshot */}
+            {/* Big Typography matching official design */}
             <div className="pt-4 space-y-1">
+              <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold tracking-wider">
+                <Fingerprint className="w-3 h-3" />
+                <span>HMAC-SHA256 ENCRYPTED</span>
+              </div>
               <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-white font-sans">
                 RRB
               </h1>
               <div className="text-xl sm:text-2xl font-bold tracking-widest text-slate-100 uppercase">
-                ADMIN PORTAL
+                ADMIN VAULT
               </div>
               <div className="w-16 h-1 bg-red-600 rounded-full mt-2" />
-              <p className="text-sm text-slate-300 pt-2 font-medium tracking-wide">
-                Secure. Manage. Monitor.
+              <p className="text-xs sm:text-sm text-slate-300 pt-2 font-medium tracking-wide">
+                Encrypted Control Center • Master Administrator Access Only
               </p>
             </div>
 
           </div>
 
-          {/* Bottom Overlay Card: "Secure Access" */}
+          {/* Bottom Overlay Card: "Encrypted Master Access" */}
           <div className="relative z-10 mt-8">
-            <div className="bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-2xl p-4 flex items-center space-x-3.5 shadow-xl">
+            <div className="bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-4 flex items-center space-x-3.5 shadow-xl">
               <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center shrink-0">
                 <Lock className="w-5 h-5" />
               </div>
               <div>
                 <div className="text-sm font-bold text-white flex items-center gap-1.5">
-                  <span>Secure Access</span>
+                  <span>Encrypted Master Access</span>
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                 </div>
                 <p className="text-xs text-slate-400 font-normal leading-snug mt-0.5">
-                  This portal is for authorized administrators only.
+                  Protected with cryptographic session tokens and brute-force lockout.
                 </p>
               </div>
             </div>
@@ -159,19 +191,29 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, onCancel }) =
             
             {/* Header Shield & Titles */}
             <div className="text-center space-y-1.5">
-              <div className="w-16 h-16 rounded-full bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center mx-auto mb-2 shadow-inner">
-                <Shield className="w-8 h-8" />
+              <div className="w-16 h-16 rounded-full bg-slate-900 border border-slate-800 text-amber-400 flex items-center justify-center mx-auto mb-2 shadow-lg">
+                <KeyRound className="w-8 h-8" />
               </div>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                Admin Login
+                Master Admin Login
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                Sign in with your Admin ID and Password to access RRB Admin Portal
+                Strict Authentication • Only Authorized Administrator Can Login
               </p>
             </div>
 
+            {/* Lockout Countdown Alert */}
+            {lockCountdown && lockCountdown > 0 && (
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-start space-x-2.5 animate-pulse">
+                <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                <div className="leading-snug font-bold">
+                  Security Lockout Active: Please wait <span className="font-mono text-sm underline">{lockCountdown}s</span> before retrying.
+                </div>
+              </div>
+            )}
+
             {/* Error Message Alert */}
-            {errorMsg && (
+            {errorMsg && !lockCountdown && (
               <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start space-x-2.5 animate-in fade-in">
                 <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                 <div className="leading-snug font-medium">{errorMsg}</div>
@@ -192,7 +234,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, onCancel }) =
               {/* Field 1: Username / Email */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">
-                  Username / Email ID
+                  Master Admin Username / Email ID
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -205,10 +247,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, onCancel }) =
                       setUsernameOrEmail(e.target.value);
                       if (errorMsg) setErrorMsg(null);
                     }}
-                    placeholder="Enter your admin username or email"
-                    autoComplete="off"
+                    placeholder="Enter Admin ID / Email / Mobile"
+                    autoComplete="username"
                     required
-                    className="w-full pl-10 pr-3.5 py-3.5 bg-slate-50/80 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 focus:bg-white transition-all font-medium"
+                    disabled={isLoading || Boolean(lockCountdown)}
+                    className="w-full pl-10 pr-3.5 py-3.5 bg-slate-50/80 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900 focus:bg-white transition-all font-medium disabled:opacity-50"
                   />
                 </div>
               </div>
@@ -216,7 +259,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, onCancel }) =
               {/* Field 2: Password (Hidden by default) */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">
-                  Password
+                  Master Password
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -229,10 +272,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, onCancel }) =
                       setPassword(e.target.value);
                       if (errorMsg) setErrorMsg(null);
                     }}
-                    placeholder="Enter your password"
-                    autoComplete="off"
+                    placeholder="Enter Master Password"
+                    autoComplete="current-password"
                     required
-                    className="w-full pl-10 pr-11 py-3.5 bg-slate-50/80 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 focus:bg-white transition-all font-medium"
+                    disabled={isLoading || Boolean(lockCountdown)}
+                    className="w-full pl-10 pr-11 py-3.5 bg-slate-50/80 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900 focus:bg-white transition-all font-medium disabled:opacity-50"
                   />
                   <button
                     type="button"
@@ -246,45 +290,40 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, onCancel }) =
                 </div>
               </div>
 
-              {/* Row: Remember Me */}
+              {/* Row: Remember Me & Encryption status */}
               <div className="flex items-center justify-between text-xs pt-1">
                 <label className="flex items-center space-x-2 text-slate-600 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
                   />
-                  <span className="font-medium">Remember this device</span>
+                  <span className="font-medium">Keep session active</span>
                 </label>
+                <span className="text-[11px] font-mono text-emerald-700 font-bold flex items-center space-x-1">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>256-Bit SSL</span>
+                </span>
               </div>
 
-              {/* Login Button (High contrast blue button) */}
+              {/* Login Button (High contrast dark slate button with gold accent) */}
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold text-sm transition-all shadow-md shadow-blue-600/20 hover:shadow-lg disabled:opacity-70 flex items-center justify-center space-x-2 cursor-pointer mt-2"
+                disabled={isLoading || Boolean(lockCountdown)}
+                className="w-full py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white font-black text-sm transition-all shadow-md shadow-slate-900/20 hover:shadow-lg disabled:opacity-50 flex items-center justify-center space-x-2 cursor-pointer mt-2"
               >
                 {isLoading ? (
-                  <span>Authenticating...</span>
+                  <span className="flex items-center space-x-2">
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Verifying HMAC Handshake...</span>
+                  </span>
                 ) : (
                   <>
-                    <ArrowRight className="w-4 h-4" />
-                    <span>Login to Admin Portal</span>
+                    <ArrowRight className="w-4 h-4 text-amber-400" />
+                    <span>Authenticate & Access Admin Vault</span>
                   </>
                 )}
-              </button>
-
-              {/* Instant 1-Click Access Demo Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  loginAdmin('admin', 'rrbadmin2025', true);
-                  onSuccess();
-                }}
-                className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-900 font-bold text-xs transition-all flex items-center justify-center space-x-2 cursor-pointer"
-              >
-                <span>⚡ Instant Admin Login</span>
               </button>
 
             </form>
@@ -293,7 +332,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, onCancel }) =
             <div className="pt-4 text-center border-t border-slate-100">
               <div className="inline-flex items-center space-x-1.5 text-xs text-slate-500">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>Secure & Official Login Portal of Indian Railways</span>
+                <span>Protected by Cryptographic Signatures & Master Auth Controls</span>
               </div>
             </div>
 
