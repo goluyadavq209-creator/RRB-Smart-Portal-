@@ -167,6 +167,72 @@ export interface CandidatePortalLink {
   notes?: string;
 }
 
+export interface AdPlacement {
+  id: string;
+  placement: string;
+  adType: 'Google AdSense' | 'Media.net' | 'Custom Banner' | 'Direct HTML / Script';
+  adCodeId: string;
+  status: boolean;
+  displayOn: 'desktop_mobile' | 'mobile_only' | 'desktop_only';
+  priority: number;
+  codeSnippet?: string;
+  clickUrl?: string;
+  notes?: string;
+}
+
+export interface SponsoredPost {
+  id: string;
+  title: string;
+  company: string;
+  duration: string;
+  amount: number;
+  status: 'Active' | 'Inactive' | 'Scheduled';
+  logoUrl?: string;
+  targetUrl?: string;
+}
+
+export interface AffiliateProduct {
+  id: string;
+  productName: string;
+  category: string;
+  commission: string;
+  clicks: number;
+  conversions: number;
+  status: 'Active' | 'Inactive';
+  affiliateUrl?: string;
+  imageUrl?: string;
+}
+
+export interface MonetizationData {
+  summary: {
+    todayEarnings: number;
+    todayGrowth: number;
+    thisMonthEarnings: number;
+    thisMonthGrowth: number;
+    adEarnings: number;
+    adGrowth: number;
+    sponsoredEarnings: number;
+    sponsoredGrowth: number;
+    affiliateEarnings: number;
+    affiliateGrowth: number;
+    totalEarnings: number;
+    totalGrowth: number;
+  };
+  adPlacements: AdPlacement[];
+  sponsoredPosts: SponsoredPost[];
+  affiliateProducts: AffiliateProduct[];
+  topPagesRevenue: Array<{ page: string; revenue: number; percentage: number }>;
+}
+
+export interface SiteSettings {
+  isWebsiteLive: boolean; // true = LIVE (normal website), false = OFF (Coming Soon / Under Maintenance)
+  maintenanceTitle?: string;
+  maintenanceMessage?: string;
+  expectedLaunchDate?: string;
+  supportContactEmail?: string;
+  telegramChannelUrl?: string;
+}
+
 export interface FullRRBDatabase {
   metadata: {
     version: string;
@@ -175,6 +241,7 @@ export interface FullRRBDatabase {
     source?: string;
     notes?: string;
   };
+  settings?: SiteSettings;
   zones: RRBZone[];
   exams: ExamItem[];
   cutoffs: CutoffRecord[];
@@ -182,6 +249,7 @@ export interface FullRRBDatabase {
   results: ResultItem[];
   portalLinks?: CandidatePortalLink[];
   candidateScorecards?: CandidateScoreRecord[];
+  monetization?: MonetizationData;
 }
 
 export type QuestionOption = 'Option 1' | 'Option 2' | 'Option 3' | 'Option 4';

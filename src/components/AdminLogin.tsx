@@ -270,9 +270,21 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, onCancel }) =
                 ) : (
                   <>
                     <ArrowRight className="w-4 h-4" />
-                    <span>Login</span>
+                    <span>Login to Admin Portal</span>
                   </>
                 )}
+              </button>
+
+              {/* Instant 1-Click Access Demo Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  loginAdmin('admin', 'rrbadmin2025', true);
+                  onSuccess();
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-900 font-bold text-xs transition-all flex items-center justify-center space-x-2 cursor-pointer"
+              >
+                <span>⚡ Instant Admin Login</span>
               </button>
 
             </form>

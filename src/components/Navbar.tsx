@@ -280,7 +280,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               { id: 'notices' as TabView, label: 'Answer Keys & Notices', badge: database.notices.length },
               { id: 'results' as TabView, label: 'Results & Panels', badge: database.results.length },
               { id: 'admin' as TabView, label: isAdminAuthenticated ? 'Admin Panel' : 'Admin Login', icon: isAdminAuthenticated ? Unlock : Lock },
-            ].map((item) => {
+            ].map((item, idx) => {
               const isActive = currentTab === item.id;
               return (
                 <button

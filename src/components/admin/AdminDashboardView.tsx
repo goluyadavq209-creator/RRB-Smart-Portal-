@@ -37,6 +37,7 @@ interface AdminDashboardViewProps {
   onQuickAddNotice: () => void;
   onQuickAddExam: () => void;
   onSwitchUserSite: (tab: TabView) => void;
+  onToggleWebsiteLive?: () => void;
 }
 
 export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
@@ -47,6 +48,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   onQuickAddNotice,
   onQuickAddExam,
   onSwitchUserSite,
+  onToggleWebsiteLive,
 }) => {
   const [analyticsTimeRange, setAnalyticsTimeRange] = useState<'30' | '90' | '365'>('30');
   const [selectedDateFilter, setSelectedDateFilter] = useState('All Time');
@@ -134,6 +136,62 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Master Website ON/OFF Maintenance Switch Box */}
+      {(() => {
+        const isLive = database.settings?.isWebsiteLive !== false;
+        return (
+          <div className={`p-5 rounded-2xl border transition-all shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+            isLive 
+              ? 'bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-950 border-emerald-800/60 text-white' 
+              : 'bg-gradient-to-r from-rose-950 via-slate-900 to-slate-950 border-rose-800/60 text-white'
+          }`}>
+            <div className="flex items-center space-x-3.5">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-inner border ${
+                isLive 
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+                  : 'bg-rose-500/20 text-rose-400 border-rose-500/30 animate-pulse'
+              }`}>
+                {isLive ? '🌐' : '🚧'}
+              </div>
+              <div>
+                <div className="flex items-center space-x-2.5">
+                  <h2 className="text-base font-black text-white">
+                    Website Status: {isLive ? 'LIVE & ACTIVE (ON)' : 'OFF (Coming Soon / Under Maintenance)'}
+                  </h2>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                    isLive 
+                      ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-400/40' 
+                      : 'bg-rose-500/30 text-rose-300 border border-rose-400/40 animate-pulse'
+                  }`}>
+                    {isLive ? '🟢 Public Live' : '🔴 Coming Soon Mode'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-1 font-medium">
+                  {isLive 
+                    ? 'All public candidates can access full website, mock tests, cutoffs, and answer keys normally.' 
+                    : 'Visitors opening the website link will see the Coming Soon / Maintenance page. Admin panel remains fully accessible to you.'}
+                </p>
+              </div>
+            </div>
+
+            {onToggleWebsiteLive && (
+              <button
+                type="button"
+                onClick={onToggleWebsiteLive}
+                className={`px-5 py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer shadow-lg flex items-center justify-center space-x-2 shrink-0 self-start sm:self-auto ${
+                  isLive
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white hover:shadow-rose-900/40'
+                    : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 hover:shadow-emerald-900/40'
+                }`}
+              >
+                <span>{isLive ? '🔴 Turn OFF Website (Coming Soon Mode)' : '🟢 Turn ON Website (Live Mode)'}</span>
+                <span>→</span>
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {/* 5 Primary Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">

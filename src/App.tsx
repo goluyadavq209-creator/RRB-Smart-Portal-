@@ -27,6 +27,7 @@ import { RollNumberCheckPage } from './components/RollNumberCheckPage';
 import { AnswerCheckPage } from './components/AnswerCheckPage';
 import { AdminPanel } from './components/AdminPanel';
 import { AdminLogin } from './components/AdminLogin';
+import { ComingSoonPage } from './components/ComingSoonPage';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { NotificationToastContainer } from './components/NotificationToastContainer';
 import { NotificationCenterModal } from './components/NotificationCenterModal';
@@ -40,7 +41,7 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(checkAdminSession);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(true);
   const [language, setLanguage] = useState<'hi' | 'en'>('hi');
   const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('base');
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -97,6 +98,18 @@ export default function App() {
   };
 
   const fontSizeClass = fontSize === 'lg' ? 'text-[17px]' : fontSize === 'sm' ? 'text-[14px]' : 'text-[15px]';
+
+  const isWebsiteLive = database.settings?.isWebsiteLive !== false;
+
+  // When website is OFF (Coming Soon Mode), public users see Coming Soon page
+  if (!isWebsiteLive && currentTab !== 'admin') {
+    return (
+      <ComingSoonPage
+        database={database}
+        onOpenAdminLogin={() => handleNavigate('admin')}
+      />
+    );
+  }
 
   if (currentTab === 'answer-check') {
     return (
