@@ -1,13 +1,20 @@
 import { CutoffRecord, ExamItem, FullRRBDatabase, NoticeItem, ResultItem, CandidatePortalLink, OFFICIAL_RRB_DIGIALM_LOGIN_URL } from '../types';
 import { INITIAL_EMPTY_DATABASE, OFFICIAL_RRB_ZONES, SAMPLE_TEMPLATE_DATABASE, DEFAULT_CANDIDATE_PORTAL_LINKS, REAL_OFFICIAL_CUTOFFS } from '../data/defaultData';
+import { saveToIndexedDBVault, loadFromIndexedDBVault, requestPersistentStorage } from './indexedDbStorage';
 
 const STORAGE_KEY = 'rrb_portal_database_clean_v3';
 
 export function loadRRBDatabase(): FullRRBDatabase {
   try {
+    // Attempt to request persistent high-capacity browser quota
+    if (typeof window !== 'undefined') {
+      requestPersistentStorage().catch(() => {});
+    }
+
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_EMPTY_DATABASE));
+      saveToIndexedDBVault(INITIAL_EMPTY_DATABASE).catch(() => {});
       return INITIAL_EMPTY_DATABASE;
     }
     const parsed = JSON.parse(raw) as FullRRBDatabase;
@@ -40,7 +47,7 @@ export function loadRRBDatabase(): FullRRBDatabase {
       url: pl?.url || OFFICIAL_RRB_DIGIALM_LOGIN_URL,
     }));
 
-    return {
+    const finalDatabase: FullRRBDatabase = {
       metadata: parsed.metadata || INITIAL_EMPTY_DATABASE.metadata,
       zones: Array.isArray(parsed.zones) && parsed.zones.length > 0 ? parsed.zones : OFFICIAL_RRB_ZONES,
       exams,
@@ -49,6 +56,11 @@ export function loadRRBDatabase(): FullRRBDatabase {
       results,
       portalLinks,
     };
+
+    // Mirror in high-capacity 1TB IndexedDB vault
+    saveToIndexedDBVault(finalDatabase).catch(() => {});
+
+    return finalDatabase;
   } catch (err) {
     console.error('Failed to load RRB database from storage:', err);
     return INITIAL_EMPTY_DATABASE;
@@ -66,6 +78,12 @@ export function saveRRBDatabase(data: FullRRBDatabase): boolean {
       },
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+    
+    // Save to 1TB IndexedDB High-Capacity Vault asynchronously
+    saveToIndexedDBVault(dataToSave).catch((err) => {
+      console.warn('1TB IndexedDB background sync warning:', err);
+    });
+
     return true;
   } catch (err) {
     console.error('Failed to save RRB database:', err);

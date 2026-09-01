@@ -118,7 +118,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     { id: 'settings', label: 'System Settings', icon: Settings },
     { id: 'roles', label: 'Admin & Roles', icon: Shield },
     { id: 'audit_logs', label: 'Audit Logs', icon: ScrollText },
-    { id: 'backup', label: 'Backup & Restore', icon: HardDrive },
+    { id: 'backup', label: '1 TB Memory & Backup', icon: HardDrive },
   ];
 
   return (

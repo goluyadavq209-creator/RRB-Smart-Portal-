@@ -1,4 +1,5 @@
 import { FullRRBDatabase, RRBZone, CandidatePortalLink, ExamItem, CutoffRecord, NoticeItem, ResultItem } from '../types';
+import { COMPREHENSIVE_OFFICIAL_CUTOFFS } from './officialCutoffsData';
 
 // 21 Official Regional Railway Recruitment Boards - Verified against https://rrb.indianrailways.gov.in/
 export const OFFICIAL_RRB_ZONES: RRBZone[] = [
@@ -197,75 +198,7 @@ export const OFFICIAL_RRB_ZONES: RRBZone[] = [
 export const DEFAULT_CANDIDATE_PORTAL_LINKS: CandidatePortalLink[] = [];
 export const REAL_OFFICIAL_EXAMS: ExamItem[] = [];
 // Official Real RRB Cutoffs - Real data from CEN 06/2025 & CEN 01/2024
-export const REAL_OFFICIAL_CUTOFFS: CutoffRecord[] = [
-  {
-    id: 'cut-mld-062025-cbat-2er',
-    cenNumber: 'CEN 06/2025',
-    examTitle: 'RRB NTPC (Graduate) CBAT',
-    zoneCode: 'MLD',
-    zoneName: 'RRB Malda',
-    postName: 'Category 2 (ER) - Station Master / CBAT Shortlist',
-    stage: 'CBAT / Psycho Test',
-    year: 2026,
-    cutoffs: {
-      UR: 75.21368,
-      SC: 70.37037,
-      ST: 68.09118,
-      OBC: 74.92878,
-      EWS: 74.13793,
-      ExSM: 46.26437,
-    },
-    normalizedScore: true,
-    pdfReference: 'CEN_06_2025_MALDA_NTPC_CBAT_CBTST_CUTOFF.pdf',
-    updatedAt: '2026-08-27T10:00:00.000Z',
-  },
-  {
-    id: 'cut-mld-062025-cbtst-5er',
-    cenNumber: 'CEN 06/2025',
-    examTitle: 'RRB NTPC (Graduate) CBTST',
-    zoneCode: 'MLD',
-    zoneName: 'RRB Malda',
-    postName: 'Category 5 (ER) - Sr. Clerk Cum Typist / CBTST Shortlist',
-    stage: 'Typing Skill Test',
-    year: 2026,
-    cutoffs: {
-      UR: 76.72414,
-      SC: 70.37037,
-      ST: 65.81197,
-      OBC: 76.35328,
-      EWS: 75.0,
-      ExSM: 44.44444,
-      'R-LD': 58.33333,
-      PwBD: 58.33333,
-    },
-    normalizedScore: true,
-    pdfReference: 'CEN_06_2025_MALDA_NTPC_CBAT_CBTST_CUTOFF.pdf',
-    updatedAt: '2026-08-27T10:00:00.000Z',
-  },
-  {
-    id: 'cut-mld-062025-cbtst-5ser',
-    cenNumber: 'CEN 06/2025',
-    examTitle: 'RRB NTPC (Graduate) CBTST',
-    zoneCode: 'MLD',
-    zoneName: 'RRB Malda',
-    postName: 'Category 5 (SER) - Sr. Clerk Cum Typist / CBTST Shortlist',
-    stage: 'Typing Skill Test',
-    year: 2026,
-    cutoffs: {
-      UR: 74.71265,
-      SC: 70.08547,
-      ST: 65.80459,
-      OBC: 74.64388,
-      EWS: 74.64388,
-      ExSM: 44.15955,
-      'R-VI': 47.57835,
-      PwBD: 47.57835,
-    },
-    normalizedScore: true,
-    pdfReference: 'CEN_06_2025_MALDA_NTPC_CBAT_CBTST_CUTOFF.pdf',
-    updatedAt: '2026-08-27T10:00:00.000Z',
-  },
-];
+export const REAL_OFFICIAL_CUTOFFS: CutoffRecord[] = COMPREHENSIVE_OFFICIAL_CUTOFFS;
 
 // Clean Database Slate Ready for Fresh User Updates
 export const INITIAL_EMPTY_DATABASE: FullRRBDatabase = {
