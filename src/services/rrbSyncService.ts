@@ -543,13 +543,14 @@ export async function runRRBAutoSyncRoutine(): Promise<{
       }
     }
 
-    // Update settings with last and next sync timestamps
+    // Update settings with last and next sync timestamps (10-minute automatic interval)
     const now = new Date();
-    const interval = settings.intervalMinutes || 30;
-    const nextSync = new Date(now.getTime() + interval * 60 * 1000);
+    const intervalMinutes = settings.intervalMinutes || 10;
+    const nextSync = new Date(now.getTime() + intervalMinutes * 60 * 1000);
     await updateRRBSyncSettings({
       lastSyncAt: now,
       nextSyncAt: nextSync,
+      intervalMinutes,
     });
 
     const elapsed = Date.now() - startTime;

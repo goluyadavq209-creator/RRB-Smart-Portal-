@@ -73,6 +73,7 @@ interface SyncStats {
   autoSyncEnabled: boolean;
   autoPublishEnabled: boolean;
   intervalMinutes: number;
+  intervalSeconds?: number;
   lastSyncAt?: string | null;
   nextSyncAt?: string | null;
 }
@@ -90,7 +91,7 @@ export const AdminAutoUpdateView: React.FC<AdminAutoUpdateViewProps> = ({
     rejected: 0,
     autoSyncEnabled: true,
     autoPublishEnabled: true,
-    intervalMinutes: 30,
+    intervalMinutes: 10,
     lastSyncAt: null,
     nextSyncAt: null,
   });
@@ -134,7 +135,7 @@ export const AdminAutoUpdateView: React.FC<AdminAutoUpdateViewProps> = ({
           rejected: data.rejected,
           autoSyncEnabled: data.autoSyncEnabled,
           autoPublishEnabled: data.autoPublishEnabled,
-          intervalMinutes: data.intervalMinutes,
+          intervalMinutes: data.intervalMinutes ?? 10,
           lastSyncAt: data.lastSyncAt,
           nextSyncAt: data.nextSyncAt,
         });
@@ -184,6 +185,7 @@ export const AdminAutoUpdateView: React.FC<AdminAutoUpdateViewProps> = ({
     fetchSyncItems();
     fetchSyncLogs();
 
+    // Periodic status refresh
     const interval = setInterval(() => {
       fetchSyncStatus();
       fetchSyncLogs();
@@ -458,7 +460,7 @@ export const AdminAutoUpdateView: React.FC<AdminAutoUpdateViewProps> = ({
             <div className="text-right">
               <span className="text-slate-400 block text-[10px]">Next Cycle</span>
               <span className="font-bold text-slate-200">
-                {stats.nextSyncAt ? new Date(stats.nextSyncAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'Every 30m'}
+                {stats.nextSyncAt ? new Date(stats.nextSyncAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Every 10m'}
               </span>
             </div>
           </div>
@@ -478,7 +480,7 @@ export const AdminAutoUpdateView: React.FC<AdminAutoUpdateViewProps> = ({
 
           <div>
             <p className="text-xs text-slate-600">
-              Periodically checks official RRB portal every <strong>{stats.intervalMinutes} minutes</strong> without user friction.
+              Periodically checks official RRB portal every <strong>{stats.intervalMinutes || 10} minutes</strong> without user friction.
             </p>
           </div>
 

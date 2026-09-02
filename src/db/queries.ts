@@ -347,15 +347,15 @@ export async function getRRBSyncSettings() {
     if (result && result.length > 0) {
       return result[0];
     }
-    // Create initial default settings
+    // Create initial default settings (10-minute automatic sync)
     const initial = await db.insert(rrbSyncSettings)
       .values({
         key: 'default_settings',
         autoSyncEnabled: true,
         autoPublishEnabled: true,
-        intervalMinutes: 30,
+        intervalMinutes: 10,
         lastSyncAt: new Date(),
-        nextSyncAt: new Date(Date.now() + 30 * 60 * 1000),
+        nextSyncAt: new Date(Date.now() + 10 * 60 * 1000),
       })
       .returning();
     return initial[0];
@@ -366,9 +366,9 @@ export async function getRRBSyncSettings() {
       key: 'default_settings',
       autoSyncEnabled: true,
       autoPublishEnabled: true,
-      intervalMinutes: 30,
+      intervalMinutes: 10,
       lastSyncAt: new Date(),
-      nextSyncAt: new Date(Date.now() + 30 * 60 * 1000),
+      nextSyncAt: new Date(Date.now() + 10 * 60 * 1000),
       updatedAt: new Date(),
     };
   }
@@ -383,14 +383,15 @@ export async function updateRRBSyncSettings(settingsData: {
 }) {
   try {
     const now = new Date();
+    const intervalMinutes = settingsData.intervalMinutes ?? 10;
     const result = await db.insert(rrbSyncSettings)
       .values({
         key: 'default_settings',
         autoSyncEnabled: settingsData.autoSyncEnabled ?? true,
         autoPublishEnabled: settingsData.autoPublishEnabled ?? true,
-        intervalMinutes: settingsData.intervalMinutes ?? 30,
+        intervalMinutes,
         lastSyncAt: settingsData.lastSyncAt || now,
-        nextSyncAt: settingsData.nextSyncAt || new Date(now.getTime() + (settingsData.intervalMinutes || 30) * 60 * 1000),
+        nextSyncAt: settingsData.nextSyncAt || new Date(now.getTime() + intervalMinutes * 60 * 1000),
         updatedAt: now,
       })
       .onConflictDoUpdate({
@@ -641,7 +642,7 @@ export async function getRRBSyncStats() {
       rejected,
       autoSyncEnabled: settings.autoSyncEnabled ?? true,
       autoPublishEnabled: settings.autoPublishEnabled ?? true,
-      intervalMinutes: settings.intervalMinutes ?? 30,
+      intervalMinutes: settings.intervalMinutes || 10,
       lastSyncAt: settings.lastSyncAt,
       nextSyncAt: settings.nextSyncAt,
     };
@@ -654,7 +655,7 @@ export async function getRRBSyncStats() {
       rejected: 0,
       autoSyncEnabled: true,
       autoPublishEnabled: true,
-      intervalMinutes: 30,
+      intervalMinutes: 10,
       lastSyncAt: null,
       nextSyncAt: null,
     };

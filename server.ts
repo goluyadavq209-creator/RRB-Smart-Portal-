@@ -630,7 +630,7 @@ function initRRBAutoSyncScheduler() {
     }
   }, 3000);
 
-  // Periodic check every 10 minutes
+  // Periodic check every 30 seconds for the 10-minute auto-sync schedule
   setInterval(async () => {
     try {
       const settings = await getRRBSyncSettings();
@@ -640,13 +640,13 @@ function initRRBAutoSyncScheduler() {
       const nextSyncTime = settings.nextSyncAt ? new Date(settings.nextSyncAt).getTime() : 0;
 
       if (now >= nextSyncTime) {
-        console.log('⏰ Scheduled auto-sync triggered for https://rrb.indianrailways.gov.in/');
+        console.log('⏰ Scheduled auto-sync triggered for https://rrb.indianrailways.gov.in/ (10-minute cycle)');
         await runRRBAutoSyncRoutine();
       }
     } catch (err) {
       console.warn('Periodic auto-sync cycle error:', err);
     }
-  }, 10 * 60 * 1000);
+  }, 30 * 1000);
 }
 
 async function startServer() {
