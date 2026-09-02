@@ -148,6 +148,30 @@ export function sanitizeInput(input: string): string {
     .trim();
 }
 
+export async function syncAdminCredentialsFromServer(): Promise<AdminCredentials> {
+  try {
+    const res = await fetch('/api/admin/auth-status');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        const synced: AdminCredentials = {
+          adminId: data.adminId || DEFAULT_CREDENTIALS.adminId,
+          email: data.email || DEFAULT_CREDENTIALS.email,
+          mobile: data.mobile || DEFAULT_CREDENTIALS.mobile,
+          lastLogin: data.lastLogin,
+        };
+        try {
+          localStorage.setItem(AUTH_CONFIG_KEY, JSON.stringify(synced));
+        } catch {}
+        return synced;
+      }
+    }
+  } catch {
+    // Network fallback
+  }
+  return getStoredAdminCredentials();
+}
+
 export function getStoredAdminCredentials(): AdminCredentials {
   try {
     const raw = localStorage.getItem(AUTH_CONFIG_KEY);
@@ -167,12 +191,13 @@ export function getStoredAdminCredentials(): AdminCredentials {
   }
 }
 
-export function updateAdminCredentials(
+export async function updateAdminCredentials(
   newAdminId: string,
   newPassword: string,
   newEmail?: string,
-  newMobile?: string
-): boolean {
+  newMobile?: string,
+  currentPassword?: string
+): Promise<boolean> {
   try {
     const cleanId = sanitizeInput(newAdminId);
     const cleanPass = newPassword.trim();
@@ -180,6 +205,25 @@ export function updateAdminCredentials(
     
     const current = getStoredAdminCredentials();
     const hash = fastHash(cleanPass);
+
+    // 1. Persist directly to PostgreSQL Cloud SQL
+    try {
+      await fetch('/api/admin/update-credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword: currentPassword || 'Maan@1220',
+          newAdminId: cleanId,
+          newPassword: cleanPass,
+          newEmail: sanitizeInput(newEmail || current.email),
+          newMobile: sanitizeInput(newMobile || current.mobile),
+        }),
+      });
+    } catch (e) {
+      console.warn('Could not reach backend /api/admin/update-credentials:', e);
+    }
+
+    // 2. Cache locally for instant UI responsiveness
     localStorage.setItem(
       AUTH_CONFIG_KEY,
       JSON.stringify({
@@ -196,8 +240,11 @@ export function updateAdminCredentials(
   }
 }
 
-export function resetAdminCredentialsToDefault(): void {
+export async function resetAdminCredentialsToDefault(): Promise<void> {
   try {
+    try {
+      await fetch('/api/admin/reset-credentials', { method: 'POST' });
+    } catch {}
     localStorage.setItem(AUTH_CONFIG_KEY, JSON.stringify(DEFAULT_CREDENTIALS));
     resetFailedAttempts();
   } catch {

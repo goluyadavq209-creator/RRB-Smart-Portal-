@@ -436,46 +436,7 @@ export const AdminRollNumbersView: React.FC<AdminRollNumbersViewProps> = ({
   };
 
   // Candidate scorecards list for table display
-  const allCandidateScorecards = [
-    ...(database.candidateScorecards || []),
-    // Default fallback sample candidate
-    {
-      rollNumber: '11029482015',
-      name: 'Vikash Meena',
-      registrationNo: 'RRB110928301',
-      rawMarks: 68.66,
-      normalizedScore: 75.30,
-      community: 'ST',
-      zonalRank: 28,
-      cenNumber: 'CEN 02/2024',
-      examName: 'RRB Technician Gr. I & Gr. III',
-      zoneName: 'RRB Ajmer',
-    },
-    {
-      rollNumber: '24019283011',
-      name: 'Rahul Kumar Sharma',
-      registrationNo: 'RRB249821039',
-      rawMarks: 78.66,
-      normalizedScore: 84.42,
-      community: 'UR',
-      zonalRank: 19,
-      cenNumber: 'CEN 05/2024',
-      examName: 'RRB NTPC (Graduate)',
-      zoneName: 'RRB Prayagraj',
-    },
-    {
-      rollNumber: '28014820194',
-      name: 'Pooja Verma',
-      registrationNo: 'RRB280119283',
-      rawMarks: 64.33,
-      normalizedScore: 71.85,
-      community: 'OBC (NCL)',
-      zonalRank: 42,
-      cenNumber: 'CEN 01/2024',
-      examName: 'RRB Assistant Loco Pilot (ALP)',
-      zoneName: 'RRB Mumbai',
-    }
-  ];
+  const allCandidateScorecards = database.candidateScorecards || [];
 
   return (
     <div className="space-y-6 animate-in fade-in">

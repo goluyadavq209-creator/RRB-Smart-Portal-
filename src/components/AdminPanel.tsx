@@ -36,7 +36,8 @@ import {
   HelpCircle,
   KeyRound,
   FileCheck2,
-  CheckSquare
+  CheckSquare,
+  ShieldCheck
 } from 'lucide-react';
 import { FullRRBDatabase, TabView } from '../types';
 import { logoutAdmin } from '../utils/auth';
@@ -49,6 +50,7 @@ import { AdminCenView } from './admin/AdminCenView';
 import { AdminCutoffView } from './admin/AdminCutoffView';
 import { AdminNoticesView } from './admin/AdminNoticesView';
 import { AdminAutoUpdateView } from './admin/AdminAutoUpdateView';
+import { AdminAutoMonitorView } from './admin/AdminAutoMonitorView';
 import { AdminUsersView } from './admin/AdminUsersView';
 import { AdminAnalyticsView } from './admin/AdminAnalyticsView';
 import { AdminSearchMgmtView } from './admin/AdminSearchMgmtView';
@@ -76,6 +78,7 @@ export type AdminMenuTab =
   | 'zones'
   | 'notices'
   | 'auto_update'
+  | 'auto_monitor'
   | 'search_mgmt'
   | 'links'
   | 'settings'
@@ -237,6 +240,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
               <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-red-950 text-red-300 border border-red-800">
                 LIVE
+              </span>
+            </button>
+
+            {/* 2b. Auto Monitor & Self-Healing Watchdog (AUTONOMOUS DIAGNOSTICS & REPAIR) */}
+            <button
+              id="sidebar-btn-auto-monitor"
+              onClick={() => { setActiveTab('auto_monitor'); setSidebarOpen(false); }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all cursor-pointer ${
+                activeTab === 'auto_monitor'
+                  ? 'bg-emerald-600 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <div className="flex items-center">
+                <ShieldCheck className="w-4 h-4 mr-3 shrink-0 text-emerald-400" />
+                <span>Auto Monitor & Healing</span>
+              </div>
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-950 text-emerald-300 border border-emerald-800 animate-pulse">
+                AUTO-HEAL
               </span>
             </button>
 
@@ -627,6 +649,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               setDatabase={setDatabase}
               onSuccessMessage={showToast}
             />
+          )}
+
+          {activeTab === 'auto_monitor' && (
+            <AdminAutoMonitorView />
           )}
 
           {activeTab === 'users' && (

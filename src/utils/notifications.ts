@@ -27,6 +27,7 @@ export interface AppNotification {
   read: boolean;
   zoneCode?: string;
   badgeText?: string;
+  linkUrl?: string;
 }
 
 const PREFS_STORAGE_KEY = 'rrb_notification_preferences_v1';
@@ -48,19 +49,8 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   zoneFilter: 'ALL',
 };
 
-// Initial welcome / baseline notifications if user has fresh state
-const INITIAL_NOTIFICATIONS: AppNotification[] = [
-  {
-    id: 'notif-welcome-1',
-    title: 'RRB Real-time Notification System Active',
-    message: 'You will receive instant alerts whenever new CEN Exams, Cut-Off Marks, Official Notices, or Result Merit Lists are uploaded.',
-    category: 'system',
-    targetTab: 'home',
-    timestamp: new Date().toISOString(),
-    read: false,
-    badgeText: 'System Alert',
-  },
-];
+// Initial baseline notifications if user has fresh state
+const INITIAL_NOTIFICATIONS: AppNotification[] = [];
 
 // Load Notification Preferences
 export function getNotificationPreferences(): NotificationPreferences {
@@ -135,8 +125,70 @@ export async function requestBrowserNotificationPermission(): Promise<Notificati
   }
 }
 
+const READ_NOTIFS_KEY = 'rrb_read_notif_ids_v1';
+
+// In-memory cache for live server notifications
+let cachedServerNotifications: AppNotification[] = [];
+
+// Helper: Get set of read notification IDs from client local storage
+export function getReadNotificationIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(READ_NOTIFS_KEY);
+    if (!raw) return new Set<string>();
+    const parsed = JSON.parse(raw);
+    return new Set<string>(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+// Helper: Save read notification IDs to client local storage
+export function saveReadNotificationId(id: string): void {
+  try {
+    const ids = getReadNotificationIds();
+    ids.add(id);
+    localStorage.setItem(READ_NOTIFS_KEY, JSON.stringify(Array.from(ids).slice(-100)));
+  } catch {}
+}
+
+// Fetch live notifications from Cloud SQL PostgreSQL database
+export async function fetchServerLiveNotifications(limit = 40): Promise<AppNotification[]> {
+  try {
+    const res = await fetch(`/api/database/notifications?limit=${limit}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.notifications)) {
+        const readIds = getReadNotificationIds();
+        const serverItems: AppNotification[] = data.notifications.map((row: any) => ({
+          id: `db-notif-${row.id}`,
+          title: row.title,
+          message: row.message,
+          category: (row.category || 'general') as any,
+          timestamp: row.createdAt ? new Date(row.createdAt).toISOString() : new Date().toISOString(),
+          read: readIds.has(`db-notif-${row.id}`),
+          linkUrl: row.linkUrl,
+          targetTab: row.targetTab,
+          zoneCode: 'ALL',
+        }));
+        cachedServerNotifications = serverItems;
+        return serverItems;
+      }
+    }
+  } catch (err) {
+    console.warn('Could not fetch notifications from Cloud SQL:', err);
+  }
+  return getStoredNotifications();
+}
+
 // Get Stored Notifications
 export function getStoredNotifications(): AppNotification[] {
+  if (cachedServerNotifications.length > 0) {
+    const readIds = getReadNotificationIds();
+    return cachedServerNotifications.map(n => ({
+      ...n,
+      read: readIds.has(n.id) || n.read,
+    }));
+  }
   try {
     const raw = localStorage.getItem(NOTIFS_STORAGE_KEY);
     if (!raw) {
@@ -152,7 +204,6 @@ export function getStoredNotifications(): AppNotification[] {
 // Save Stored Notifications
 export function saveStoredNotifications(notifs: AppNotification[]): void {
   try {
-    // Keep maximum 50 most recent notifications
     const trimmed = notifs.slice(0, 50);
     localStorage.setItem(NOTIFS_STORAGE_KEY, JSON.stringify(trimmed));
   } catch (err) {
@@ -162,6 +213,8 @@ export function saveStoredNotifications(notifs: AppNotification[]): void {
 
 // Mark Single Notification as Read
 export function markNotificationAsRead(id: string): AppNotification[] {
+  saveReadNotificationId(id);
+  cachedServerNotifications = cachedServerNotifications.map(n => n.id === id ? { ...n, read: true } : n);
   const current = getStoredNotifications();
   const updated = current.map((n) => (n.id === id ? { ...n, read: true } : n));
   saveStoredNotifications(updated);
@@ -172,6 +225,8 @@ export function markNotificationAsRead(id: string): AppNotification[] {
 // Mark All Notifications as Read
 export function markAllNotificationsAsRead(): AppNotification[] {
   const current = getStoredNotifications();
+  current.forEach(n => saveReadNotificationId(n.id));
+  cachedServerNotifications = cachedServerNotifications.map(n => ({ ...n, read: true }));
   const updated = current.map((n) => ({ ...n, read: true }));
   saveStoredNotifications(updated);
   triggerNotificationUpdate();
@@ -180,6 +235,9 @@ export function markAllNotificationsAsRead(): AppNotification[] {
 
 // Clear All Notifications
 export function clearAllNotifications(): AppNotification[] {
+  const current = getStoredNotifications();
+  current.forEach(n => saveReadNotificationId(n.id));
+  cachedServerNotifications = [];
   const updated: AppNotification[] = [];
   saveStoredNotifications(updated);
   triggerNotificationUpdate();
@@ -276,7 +334,25 @@ export function dispatchNewDataNotification(
     read: false,
   };
 
-  // 1. Save to local storage list
+  // 1. Broadcast to PostgreSQL Cloud SQL so all connected devices receive this update
+  try {
+    fetch('/api/database/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: newNotification.title,
+        message: newNotification.message,
+        category: newNotification.category || 'general',
+        targetTab: newNotification.targetTab,
+        linkUrl: newNotification.linkUrl,
+      }),
+    }).catch((err) => {
+      console.warn('Silent notice broadcast to Cloud SQL:', err);
+    });
+  } catch {}
+
+  // 2. Add to active in-memory list
+  cachedServerNotifications = [newNotification, ...cachedServerNotifications];
   const current = getStoredNotifications();
   const updated = [newNotification, ...current];
   saveStoredNotifications(updated);

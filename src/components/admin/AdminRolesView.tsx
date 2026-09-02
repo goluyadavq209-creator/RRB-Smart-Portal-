@@ -13,30 +13,44 @@ export const AdminRolesView: React.FC<AdminRolesViewProps> = ({ onSuccessMessage
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const handleUpdate = (e: React.FormEvent) => {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     const creds = getStoredAdminCredentials();
-    if (currentPassword !== creds.password) {
-      setError('Current password does not match existing credentials.');
-      return;
-    }
 
     if (newPassword && newPassword !== confirmPassword) {
       setError('New passwords do not match.');
       return;
     }
 
-    const updatedId = newAdminId.trim() || creds.adminId;
-    const updatedPass = newPassword.trim() || creds.password;
+    if (newPassword && newPassword.length < 6) {
+      setError('New password must be at least 6 characters long.');
+      return;
+    }
 
-    updateAdminCredentials(updatedId, updatedPass);
-    setCurrentPassword('');
-    setNewAdminId('');
-    setNewPassword('');
-    setConfirmPassword('');
-    onSuccessMessage('Admin credentials and security key updated successfully.');
+    const updatedId = newAdminId.trim() || creds.adminId;
+    const updatedPass = newPassword.trim() || currentPassword;
+
+    setIsSaving(true);
+    try {
+      const ok = await updateAdminCredentials(updatedId, updatedPass, undefined, undefined, currentPassword);
+      if (ok) {
+        setCurrentPassword('');
+        setNewAdminId('');
+        setNewPassword('');
+        setConfirmPassword('');
+        onSuccessMessage('Admin credentials saved to PostgreSQL Cloud SQL successfully across all devices.');
+      } else {
+        setError('Failed to update credentials. Please check your current password.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error communicating with database server.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

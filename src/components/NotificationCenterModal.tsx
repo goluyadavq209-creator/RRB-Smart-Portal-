@@ -26,6 +26,7 @@ import {
   AppNotification, 
   NotificationPreferences, 
   getStoredNotifications, 
+  fetchServerLiveNotifications,
   markNotificationAsRead, 
   markAllNotificationsAsRead, 
   clearAllNotifications, 
@@ -60,11 +61,16 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
   const [testSentMessage, setTestSentMessage] = useState<string | null>(null);
 
   // Sync state when opened or when notification event fires
-  const refreshData = () => {
+  const refreshData = async () => {
     setNotifications(getStoredNotifications());
     setPreferences(getNotificationPreferences());
     if (typeof window !== 'undefined' && 'Notification' in window) {
       setPermissionState(Notification.permission);
+    }
+    // Fetch real-time live broadcast records from Cloud SQL PostgreSQL
+    const liveNotifs = await fetchServerLiveNotifications();
+    if (liveNotifs && liveNotifs.length > 0) {
+      setNotifications(liveNotifs);
     }
   };
 

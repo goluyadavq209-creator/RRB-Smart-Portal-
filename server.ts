@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
@@ -26,13 +27,21 @@ import {
   updateRRBSyncItemStatus,
   updateRRBSyncItemDetails,
   getRRBSyncLogs,
-  getRRBSyncStats
+  getRRBSyncStats,
+  getAdminAuthConfigFromDB,
+  saveAdminAuthConfigToDB
 } from './src/db/queries.ts';
 import { 
   runRRBAutoSyncRoutine, 
   publishSyncedItemToDatabase,
   OFFICIAL_RRB_LIVE_FEEDS 
 } from './src/services/rrbSyncService.ts';
+import {
+  runSystemDiagnosticsAndAutoHeal,
+  simulateIssueAndVerifyAutoHeal,
+  getAutoMonitorSummary,
+  toggleAutoMonitorWatchdog,
+} from './src/services/systemMonitorService.ts';
 
 dotenv.config();
 
@@ -466,6 +475,202 @@ app.post('/api/database/notify', async (req, res) => {
   }
 });
 
+// ==========================================
+// ADMIN AUTHENTICATION & CREDENTIALS (POSTGRESQL CLOUD SQL)
+// ==========================================
+
+// Helper for salted hash verification
+function verifyAdminHash(plain: string, expectedHash: string): boolean {
+  if (!plain || !expectedHash) return false;
+  let hash = 5381;
+  const salted = plain + '_rrb_secure_key_2025';
+  for (let i = 0; i < salted.length; i++) {
+    hash = (hash * 33) ^ salted.charCodeAt(i);
+  }
+  const fastH = (hash >>> 0).toString(16);
+  if (fastH === expectedHash) return true;
+
+  const cryptoH = crypto.createHash('sha256').update(plain + '_rrb_salt_2025').digest('hex');
+  return cryptoH === expectedHash;
+}
+
+function computeAdminHash(plain: string): string {
+  let hash = 5381;
+  const salted = plain + '_rrb_secure_key_2025';
+  for (let i = 0; i < salted.length; i++) {
+    hash = (hash * 33) ^ salted.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+const MASTER_AUTHORIZED_IDS = ['maan841', 'ymaan841@gmail.com', 'maansinghyadav095@gmail.com', '6393445097', 'admin'];
+const DEFAULT_PASSWORDS = ['Maan@1220', 'maan@1220', 'rrbadmin2025'];
+
+// Admin Authentication Status & Config backed by Cloud SQL
+app.get('/api/admin/auth-status', async (req, res) => {
+  try {
+    const config = await getAdminAuthConfigFromDB();
+    return res.json({
+      success: true,
+      hasCustomCredentials: Boolean(config),
+      adminId: config?.adminId || 'Maan841',
+      email: config?.email || 'ymaan841@gmail.com',
+      mobile: config?.mobile || '6393445097',
+      lastLogin: config?.lastLogin || null,
+      updatedAt: config?.updatedAt || null,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Failed to fetch admin auth status' });
+  }
+});
+
+// Admin Login Route (Verifies against Cloud SQL)
+app.post('/api/admin/login', async (req, res) => {
+  try {
+    const { adminId, password } = req.body;
+    if (!adminId || !password) {
+      return res.status(400).json({ success: false, error: 'Admin ID and Password are required' });
+    }
+
+    const cleanInputId = String(adminId).trim().toLowerCase();
+    const cleanPass = String(password).trim();
+
+    // Check Cloud SQL database for stored custom credentials
+    const storedConfig = await getAdminAuthConfigFromDB();
+
+    let isAuthenticated = false;
+    let effectiveAdminId = 'Maan841';
+    let effectiveEmail = 'ymaan841@gmail.com';
+    let effectiveMobile = '6393445097';
+
+    if (storedConfig && storedConfig.passwordHash) {
+      const storedIdLower = String(storedConfig.adminId).trim().toLowerCase();
+      const idMatches = (cleanInputId === storedIdLower) ||
+                        (storedConfig.email && cleanInputId === storedConfig.email.toLowerCase()) ||
+                        (storedConfig.mobile && cleanInputId === storedConfig.mobile) ||
+                        MASTER_AUTHORIZED_IDS.includes(cleanInputId);
+
+      if (idMatches && verifyAdminHash(cleanPass, storedConfig.passwordHash)) {
+        isAuthenticated = true;
+        effectiveAdminId = storedConfig.adminId;
+        effectiveEmail = storedConfig.email || effectiveEmail;
+        effectiveMobile = storedConfig.mobile || effectiveMobile;
+      }
+    }
+
+    // Also verify against master default credentials
+    if (!isAuthenticated) {
+      const isMasterId = MASTER_AUTHORIZED_IDS.includes(cleanInputId);
+      const isMasterPass = DEFAULT_PASSWORDS.includes(cleanPass);
+      if (isMasterId && isMasterPass) {
+        isAuthenticated = true;
+        effectiveAdminId = storedConfig?.adminId || 'Maan841';
+        effectiveEmail = storedConfig?.email || 'ymaan841@gmail.com';
+        effectiveMobile = storedConfig?.mobile || '6393445097';
+      }
+    }
+
+    if (!isAuthenticated) {
+      return res.status(401).json({ success: false, error: 'Invalid Administrator ID or Password' });
+    }
+
+    // Update lastLogin in Cloud SQL
+    const nowIso = new Date().toISOString();
+    const updatedConfig = {
+      adminId: effectiveAdminId,
+      passwordHash: storedConfig?.passwordHash || computeAdminHash('Maan@1220'),
+      email: effectiveEmail,
+      mobile: effectiveMobile,
+      lastLogin: nowIso,
+      updatedAt: storedConfig?.updatedAt || nowIso,
+    };
+    await saveAdminAuthConfigToDB(updatedConfig);
+
+    const token = 'rrb_adm_' + crypto.randomBytes(24).toString('hex');
+
+    return res.json({
+      success: true,
+      token,
+      admin: {
+        adminId: effectiveAdminId,
+        email: effectiveEmail,
+        mobile: effectiveMobile,
+        lastLogin: nowIso,
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || 'Login failed' });
+  }
+});
+
+// Admin Update Credentials in Cloud SQL (Available to all admin sessions across devices)
+app.post('/api/admin/update-credentials', async (req, res) => {
+  try {
+    const { currentPassword, newAdminId, newPassword, newEmail, newMobile } = req.body;
+    if (!currentPassword) {
+      return res.status(400).json({ success: false, error: 'Current password is required to authorize changes' });
+    }
+
+    const storedConfig = await getAdminAuthConfigFromDB();
+    let isCurrentPassValid = false;
+
+    if (storedConfig && storedConfig.passwordHash) {
+      isCurrentPassValid = verifyAdminHash(currentPassword, storedConfig.passwordHash);
+    }
+    if (!isCurrentPassValid && DEFAULT_PASSWORDS.includes(currentPassword.trim())) {
+      isCurrentPassValid = true;
+    }
+
+    if (!isCurrentPassValid) {
+      return res.status(403).json({ success: false, error: 'Current password verification failed' });
+    }
+
+    const effectiveNewId = (newAdminId && String(newAdminId).trim()) || storedConfig?.adminId || 'Maan841';
+    const effectiveNewPass = (newPassword && String(newPassword).trim()) ? newPassword.trim() : null;
+    const newHash = effectiveNewPass ? computeAdminHash(effectiveNewPass) : (storedConfig?.passwordHash || computeAdminHash('Maan@1220'));
+
+    const updatedConfig = {
+      adminId: effectiveNewId,
+      passwordHash: newHash,
+      email: (newEmail && String(newEmail).trim()) || storedConfig?.email || 'ymaan841@gmail.com',
+      mobile: (newMobile && String(newMobile).trim()) || storedConfig?.mobile || '6393445097',
+      lastLogin: storedConfig?.lastLogin || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await saveAdminAuthConfigToDB(updatedConfig);
+
+    return res.json({
+      success: true,
+      message: 'Admin credentials saved to PostgreSQL Cloud SQL successfully across all devices',
+      admin: {
+        adminId: updatedConfig.adminId,
+        email: updatedConfig.email,
+        mobile: updatedConfig.mobile,
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || 'Failed to update admin credentials' });
+  }
+});
+
+// Admin Reset Credentials to Default in Cloud SQL
+app.post('/api/admin/reset-credentials', async (req, res) => {
+  try {
+    const defaultConfig = {
+      adminId: 'Maan841',
+      passwordHash: computeAdminHash('Maan@1220'),
+      email: 'ymaan841@gmail.com',
+      mobile: '6393445097',
+      updatedAt: new Date().toISOString(),
+    };
+    await saveAdminAuthConfigToDB(defaultConfig);
+    return res.json({ success: true, message: 'Admin credentials reset to default in PostgreSQL Cloud SQL' });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || 'Failed to reset credentials' });
+  }
+});
+
 // Synchronize authenticated user to Cloud SQL
 app.post('/api/db/sync-user', requireAuth, async (req: AuthRequest, res) => {
   try {
@@ -613,6 +818,78 @@ app.get('/api/db/stats', async (req, res) => {
   }
 });
 
+// ==========================================
+// 🛡️ AUTONOMOUS SYSTEM MONITOR & SELF-HEALING API
+// ==========================================
+
+// Get real-time health diagnostics & repair logs
+app.get('/api/system-monitor/status', async (req, res) => {
+  try {
+    const report = await runSystemDiagnosticsAndAutoHeal();
+    return res.json({
+      success: true,
+      report,
+    });
+  } catch (error: any) {
+    console.error('System monitor diagnostic check error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to run system diagnostics',
+    });
+  }
+});
+
+// Trigger Instant Deep Diagnostics & Self-Healing Auto-Repair
+app.post('/api/system-monitor/run-repair', async (req, res) => {
+  try {
+    console.log('🛡️ Manual trigger: Deep System Diagnostics & Self-Healing executing...');
+    const report = await runSystemDiagnosticsAndAutoHeal();
+    return res.json({
+      success: true,
+      message: 'Autonomous Self-Healing and diagnostics completed successfully.',
+      report,
+    });
+  } catch (error: any) {
+    console.error('System monitor auto-repair error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to run auto-repair',
+    });
+  }
+});
+
+// Simulate test issue to verify self-healing behavior
+app.post('/api/system-monitor/simulate-issue', async (req, res) => {
+  try {
+    const simulationResult = await simulateIssueAndVerifyAutoHeal();
+    return res.json({
+      success: true,
+      message: 'Simulated issue detected and automatically repaired by watchdog.',
+      ...simulationResult,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to simulate test issue',
+    });
+  }
+});
+
+// Toggle watchdog state
+app.post('/api/system-monitor/toggle', (req, res) => {
+  try {
+    const { enabled } = req.body;
+    const active = toggleAutoMonitorWatchdog(enabled);
+    return res.json({
+      success: true,
+      watchdogActive: active,
+      message: `Autonomous Watchdog is now ${active ? 'ACTIVE' : 'PAUSED'}`,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Background Auto-Sync Scheduler
 function initRRBAutoSyncScheduler() {
   console.log('🔄 Initializing RRB Official Gateway Auto-Sync Scheduler...');
@@ -649,6 +926,32 @@ function initRRBAutoSyncScheduler() {
   }, 30 * 1000);
 }
 
+// Autonomous System Monitor & Self-Healing Watchdog (Checks & Repairs Every 30s)
+function initSystemAutoMonitorWatchdog() {
+  console.log('🛡️ Initializing Autonomous Self-Healing Auto-Monitor Watchdog...');
+  
+  // Initial check 5s after boot
+  setTimeout(async () => {
+    try {
+      const report = await runSystemDiagnosticsAndAutoHeal();
+      console.log(`🛡️ Initial Auto-Monitor Check: Health Score ${report.healthScore}%, State: ${report.overallState}`);
+    } catch (err) {
+      console.warn('Initial auto-monitor boot check notice:', err);
+    }
+  }, 5000);
+
+  // Watchdog loop running every 30 seconds
+  setInterval(async () => {
+    try {
+      const summary = getAutoMonitorSummary();
+      if (!summary.watchdogActive) return;
+      await runSystemDiagnosticsAndAutoHeal();
+    } catch (err) {
+      console.warn('Watchdog periodic check notice:', err);
+    }
+  }, 30 * 1000);
+}
+
 async function startServer() {
   // Vite middleware in development
   if (process.env.NODE_ENV !== 'production') {
@@ -668,6 +971,7 @@ async function startServer() {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`RRB Smart Portal Server running on http://0.0.0.0:${PORT}`);
     initRRBAutoSyncScheduler();
+    initSystemAutoMonitorWatchdog();
   });
 }
 

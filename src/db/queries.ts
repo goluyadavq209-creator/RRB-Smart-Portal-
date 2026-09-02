@@ -89,6 +89,60 @@ export async function savePortalDatabaseToDB(databaseData: any, updatedBy: strin
   }
 }
 
+// Admin Authentication Config stored in Cloud SQL PostgreSQL
+export async function getAdminAuthConfigFromDB() {
+  try {
+    const result = await db.select().from(portalDatabase).where(eq(portalDatabase.key, 'admin_auth_config')).limit(1);
+    if (!result || result.length === 0) {
+      return null;
+    }
+    const record = result[0];
+    return JSON.parse(record.data);
+  } catch (error) {
+    console.error('Database getAdminAuthConfigFromDB error:', error);
+    return null;
+  }
+}
+
+export async function saveAdminAuthConfigToDB(config: {
+  adminId: string;
+  passwordHash: string;
+  email?: string;
+  mobile?: string;
+  lastLogin?: string;
+  updatedAt?: string;
+}) {
+  try {
+    const jsonString = JSON.stringify(config);
+    const existing = await db.select().from(portalDatabase).where(eq(portalDatabase.key, 'admin_auth_config')).limit(1);
+    let result;
+    if (existing.length > 0) {
+      result = await db.update(portalDatabase)
+        .set({
+          data: jsonString,
+          updatedBy: config.adminId,
+          updatedAt: new Date(),
+        })
+        .where(eq(portalDatabase.key, 'admin_auth_config'))
+        .returning();
+    } else {
+      result = await db.insert(portalDatabase)
+        .values({
+          key: 'admin_auth_config',
+          data: jsonString,
+          version: '1.0.0',
+          updatedBy: config.adminId,
+          updatedAt: new Date(),
+        })
+        .returning();
+    }
+    return result[0];
+  } catch (error) {
+    console.error('Database saveAdminAuthConfigToDB error:', error);
+    return null;
+  }
+}
+
 // Live Notifications
 export async function createLiveNotificationRecord(
   title: string,
