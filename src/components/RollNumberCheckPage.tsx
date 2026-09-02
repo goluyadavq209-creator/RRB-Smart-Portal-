@@ -144,17 +144,6 @@ export const RollNumberCheckPage: React.FC<RollNumberCheckPageProps> = ({
         };
         setVerifiedResult(res);
         triggerConfetti();
-      } else if (targetRoll === '24019283011' || targetRoll === '11029482015') {
-        const defaultPanel = database.results[0];
-        const res: VerificationRecord = {
-          rollNumber: targetRoll,
-          status: 'QUALIFIED',
-          zoneName: defaultPanel?.zoneName || 'RRB Prayagraj (Allahabad)',
-          examName: defaultPanel?.examTitle || 'RRB NTPC (Graduate & Undergraduate)',
-          cenNumber: defaultPanel?.cenNumber || 'CEN 05/2024 & CEN 06/2024',
-        };
-        setVerifiedResult(res);
-        triggerConfetti();
       } else {
         setVerifiedResult(null);
       }

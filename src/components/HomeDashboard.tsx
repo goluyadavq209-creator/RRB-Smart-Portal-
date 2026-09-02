@@ -4,6 +4,7 @@ import { RailwayTrainHeroBanner } from './RailwayTrainHeroBanner';
 import { QuickAccessGrid } from './QuickAccessGrid';
 import { LatestUpdatesCard } from './LatestUpdatesCard';
 import { CandidateDirectLinksHub } from './CandidateDirectLinksHub';
+import { RRBZonesWidget } from './RRBZonesWidget';
 import { TrustBadgesStrip } from './TrustBadgesStrip';
 import { ExamDetailModal } from './ExamDetailModal';
 import { StudyMaterialModal } from './StudyMaterialModal';
@@ -19,33 +20,26 @@ interface HomeDashboardProps {
 export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   database,
   setCurrentTab,
-  selectedZoneFilter: _selectedZoneFilter,
-  setSelectedZoneFilter: _setSelectedZoneFilter,
+  selectedZoneFilter,
+  setSelectedZoneFilter,
   onOpenGlobalSearch,
 }) => {
-  const [activeExamFilter, setActiveExamFilter] = useState<string>('ALL');
   const [selectedExamForModal, setSelectedExamForModal] = useState<ExamItem | null>(null);
   const [studyMaterialModalOpen, setStudyMaterialModalOpen] = useState(false);
-
-  const handleSelectTrendingExam = (examCode: string) => {
-    // If already active, toggle off to ALL; otherwise activate this single exam filter
-    if (activeExamFilter === examCode) {
-      setActiveExamFilter('ALL');
-    } else {
-      setActiveExamFilter(examCode);
-    }
-  };
 
   return (
     <div className="space-y-6 sm:space-y-8 pb-10">
       {/* 1. Indian Railways Locomotive Train Hero Banner */}
       <RailwayTrainHeroBanner
-        activeExamFilter={activeExamFilter}
         onSearchSubmit={(_query) => {
           if (onOpenGlobalSearch) onOpenGlobalSearch();
           else setCurrentTab('exams');
         }}
-        onSelectTrendingExam={handleSelectTrendingExam}
+        onSelectTrendingExam={(code) => {
+          const match = database.exams.find((e) => e.title.includes(code) || e.shortCode.includes(code));
+          if (match) setSelectedExamForModal(match);
+          else setCurrentTab('exams');
+        }}
         onNavigateTab={(tab) => setCurrentTab(tab)}
       />
 
@@ -56,23 +50,31 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         onOpenStudyMaterial={() => setStudyMaterialModalOpen(true)}
       />
 
-      {/* 3. Candidate Direct Portals Hub (Filtered by active exam if selected) */}
-      <CandidateDirectLinksHub 
-        database={database} 
-        setCurrentTab={setCurrentTab}
-        activeExamFilter={activeExamFilter}
-        onClearFilter={() => setActiveExamFilter('ALL')}
-      />
+      {/* 3. Candidate Direct Portals Hub (Admit Card, Score Card, Answer Key, Exam City Slip) */}
+      <CandidateDirectLinksHub database={database} setCurrentTab={setCurrentTab} />
 
-      {/* 4. Latest Updates & Notices (Full Width, Filtered by active exam if selected) */}
-      <div className="space-y-6">
-        <LatestUpdatesCard
-          database={database}
-          setCurrentTab={setCurrentTab}
-          onOpenNoticeDetail={() => setCurrentTab('notices')}
-          activeExamFilter={activeExamFilter}
-          onClearFilter={() => setActiveExamFilter('ALL')}
-        />
+      {/* 4. Main 2-Column Grid (Left: Latest Updates & Notifications, Right: RRB Zones Official Directory) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column (Spans 7 cols on lg) */}
+        <div className="lg:col-span-7 space-y-6">
+          {/* Latest Updates Card */}
+          <LatestUpdatesCard
+            database={database}
+            setCurrentTab={setCurrentTab}
+            onOpenNoticeDetail={() => setCurrentTab('notices')}
+          />
+        </div>
+
+        {/* Right Column (Spans 5 cols on lg) */}
+        <div className="lg:col-span-5 space-y-6">
+          {/* RRB Zones Widget & Official Directory */}
+          <RRBZonesWidget
+            database={database}
+            selectedZoneFilter={selectedZoneFilter}
+            setSelectedZoneFilter={setSelectedZoneFilter}
+            setCurrentTab={setCurrentTab}
+          />
+        </div>
       </div>
 
       {/* 5. Bottom Trust Badges Strip (100% Trusted, Fast Updates, All in One Place) */}

@@ -58,12 +58,9 @@ import { AdminRolesView } from './admin/AdminRolesView';
 import { AdminAuditLogsView } from './admin/AdminAuditLogsView';
 import { AdminBackupView } from './admin/AdminBackupView';
 import { AdminRollNumbersView } from './admin/AdminRollNumbersView';
-import { AdminTelegramAutoPublishView } from './admin/AdminTelegramAutoPublishView';
-import { Send, Bot, Radio, Zap } from 'lucide-react';
 
 export type AdminMenuTab = 
   | 'dashboard'
-  | 'telegram_auto_publish'
   | 'analytics'
   | 'users'
   | 'content'
@@ -223,24 +220,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             >
               <Home className="w-4 h-4 mr-3 shrink-0" />
               <span>Dashboard</span>
-            </button>
-
-            {/* Telegram Auto Publish (AI System) */}
-            <button
-              onClick={() => { setActiveTab('telegram_auto_publish'); setSidebarOpen(false); }}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all cursor-pointer ${
-                activeTab === 'telegram_auto_publish'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-500/20'
-                  : 'text-blue-300 hover:text-white hover:bg-blue-900/30 border border-blue-500/20'
-              }`}
-            >
-              <div className="flex items-center">
-                <Send className="w-4 h-4 mr-3 shrink-0 text-blue-400" />
-                <span className="text-xs">Telegram Auto Publish</span>
-              </div>
-              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-blue-400/20 text-blue-200 border border-blue-400/30 uppercase tracking-wider">
-                AI Live
-              </span>
             </button>
 
             {/* 2. Website Analytics */}
@@ -564,14 +543,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               onQuickAddExam={() => setActiveTab('exams')}
               onSwitchUserSite={setCurrentTab}
               onToggleWebsiteLive={toggleWebsiteLive}
-            />
-          )}
-
-          {activeTab === 'telegram_auto_publish' && (
-            <AdminTelegramAutoPublishView
-              database={database}
-              setDatabase={setDatabase}
-              showToast={showToast}
             />
           )}
 

@@ -18,32 +18,17 @@ import { CandidatePortalLink, FullRRBDatabase, PortalLinkType, TabView } from '.
 interface CandidateDirectLinksHubProps {
   database: FullRRBDatabase;
   setCurrentTab: (tab: TabView) => void;
-  activeExamFilter?: string;
-  onClearFilter?: () => void;
 }
 
 export const CandidateDirectLinksHub: React.FC<CandidateDirectLinksHubProps> = ({
   database,
   setCurrentTab,
-  activeExamFilter = 'ALL',
-  onClearFilter,
 }) => {
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<'all' | PortalLinkType>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const links = Array.isArray(database?.portalLinks) ? database.portalLinks : [];
-  
-  // Apply exam filter if specified (e.g. RRB NTPC, RRB Group D, RRB Technician, RRB ALP)
-  const examMatchedLinks = activeExamFilter && activeExamFilter !== 'ALL'
-    ? links.filter((l) => {
-        if (!l) return false;
-        const target = `${l.examTitle || ''} ${l.cenNumber || ''} ${l.title || ''} ${l.description || ''}`.toLowerCase();
-        const query = activeExamFilter.toLowerCase().replace('rrb', '').trim();
-        return target.includes(query) || (l.examTitle && l.examTitle.toLowerCase().includes(activeExamFilter.toLowerCase()));
-      })
-    : links;
-
-  const activeLinks = examMatchedLinks.filter((l) => l && l.isActive);
+  const activeLinks = links.filter((l) => l && l.isActive);
 
   const filteredLinks = selectedTypeFilter === 'all'
     ? activeLinks
@@ -139,15 +124,6 @@ export const CandidateDirectLinksHub: React.FC<CandidateDirectLinksHubProps> = (
         </div>
 
         <div className="flex items-center space-x-2 self-start sm:self-auto shrink-0">
-          {activeExamFilter && activeExamFilter !== 'ALL' && (
-            <button
-              type="button"
-              onClick={onClearFilter}
-              className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-all cursor-pointer"
-            >
-              <span>✕ Clear Filter ({activeExamFilter})</span>
-            </button>
-          )}
           <button
             onClick={() => setCurrentTab('admin')}
             className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors cursor-pointer"

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Award, 
   Search, 
@@ -15,10 +15,17 @@ import {
   Check,
   X,
   ListFilter,
-  SearchCode
+  SearchCode,
+  Sparkles,
+  Building2,
+  RefreshCw,
+  Layers,
+  FileCheck2,
+  ChevronDown
 } from 'lucide-react';
 import { FullRRBDatabase, ResultItem, ResultType, TabView } from '../types';
 import { PdfViewerModal } from './PdfViewerModal';
+import { RailwayLogo } from './RailwayLogo';
 
 interface ResultsSectionProps {
   database: FullRRBDatabase;
@@ -33,12 +40,86 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
   setSelectedZoneFilter,
   setCurrentTab,
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
+  // 1. Dynamic Extraction of Available Options from Database
+  const availableExams = useMemo(() => {
+    const set = new Set<string>();
+    set.add('All Exams');
+    set.add('NTPC (Graduate)');
+    set.add('NTPC (Under Graduate)');
+    set.add('ALP (Assistant Loco Pilot)');
+    set.add('Technician Gr I & III');
+    set.add('RRB Group D (Level-1)');
+    set.add('RRB JE (Junior Engineer)');
+    set.add('RPF SI & Constable');
+    set.add('Paramedical Categories');
+
+    database.results.forEach((r) => {
+      if (r.examTitle) set.add(r.examTitle);
+    });
+    database.exams.forEach((e) => {
+      if (e.shortCode) set.add(e.shortCode);
+      if (e.title) set.add(e.title.split('-')[0].trim());
+    });
+    return Array.from(set);
+  }, [database.results, database.exams]);
+
+  const availableYears = useMemo(() => {
+    const set = new Set<string>();
+    set.add('All Years');
+    set.add('2025');
+    set.add('2024');
+    set.add('2022');
+    set.add('2019');
+    set.add('2018');
+
+    database.results.forEach((r) => {
+      if (r.publishDate) {
+        const yr = r.publishDate.match(/\b(20\d\d)\b/);
+        if (yr) set.add(yr[1]);
+      }
+    });
+    return Array.from(set);
+  }, [database.results]);
+
+  const availableStages = useMemo(() => {
+    const set = new Set<string>();
+    set.add('All Stages');
+    set.add('CBT-1 Merit List');
+    set.add('CBT-2 (Part-A)');
+    set.add('CBAT / Psycho Test');
+    set.add('Typing Skill Test');
+    set.add('Document Verification (DV)');
+    set.add('Final Provisional Panel');
+    set.add('Replacement Panel');
+
+    database.results.forEach((r) => {
+      if (r.stage) set.add(r.stage);
+    });
+    return Array.from(set);
+  }, [database.results]);
+
+  // 2. Filter States
+  const [selectedExam, setSelectedExam] = useState<string>('All Exams');
+  const [selectedYear, setSelectedYear] = useState<string>('All Years');
+  const [selectedStage, setSelectedStage] = useState<string>('All Stages');
   const [selectedType, setSelectedType] = useState<string>('ALL');
+  const [selectedZone, setSelectedZone] = useState<string>(
+    selectedZoneFilter && selectedZoneFilter !== 'ALL' ? selectedZoneFilter : 'ALL'
+  );
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // 3. Modals & UI States
   const [activePdfPreview, setActivePdfPreview] = useState<{ title: string; source: string; text?: string } | null>(null);
   const [activeRollModalResult, setActiveRollModalResult] = useState<ResultItem | null>(null);
   const [rollModalSearch, setRollModalSearch] = useState('');
   const [copiedRoll, setCopiedRoll] = useState<string | null>(null);
+
+  // Synchronize zone selection when selectedZoneFilter changes from parent
+  React.useEffect(() => {
+    if (selectedZoneFilter && selectedZoneFilter !== selectedZone) {
+      setSelectedZone(selectedZoneFilter);
+    }
+  }, [selectedZoneFilter]);
 
   const resultTypes: { label: string; value: string }[] = [
     { label: 'All Results', value: 'ALL' },
@@ -49,7 +130,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
     { label: 'Replacement Panel', value: 'Replacement Panel' },
   ];
 
-  // Helper to highlight search match in golden morning yellow (सुबह का रंग)
+  // Helper to highlight search match in golden morning yellow
   const renderHighlightedText = (text: string, query: string) => {
     if (!query || !query.trim()) {
       return <span>{text}</span>;
@@ -80,132 +161,383 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
     setTimeout(() => setCopiedRoll(null), 2000);
   };
 
-  const filteredResults = database.results.filter((res) => {
-    const activeSearch = searchQuery.toLowerCase().trim();
+  // 4. Dynamic Filter Engine Logic
+  const filteredResults = useMemo(() => {
+    return database.results.filter((res) => {
+      const activeSearch = searchQuery.toLowerCase().trim();
 
-    const matchesSearch =
-      !activeSearch ||
-      res.examTitle.toLowerCase().includes(activeSearch) ||
-      res.cenNumber.toLowerCase().includes(activeSearch) ||
-      res.zoneName.toLowerCase().includes(activeSearch) ||
-      res.stage.toLowerCase().includes(activeSearch) ||
-      (res.rollNumbersSample && res.rollNumbersSample.some((r) => r.toLowerCase().includes(activeSearch)));
+      // Search matching across multiple fields (CEN, Exam Title, Zone Name, Stage, Roll Numbers)
+      const matchesSearch =
+        !activeSearch ||
+        res.examTitle.toLowerCase().includes(activeSearch) ||
+        res.cenNumber.toLowerCase().includes(activeSearch) ||
+        res.zoneName.toLowerCase().includes(activeSearch) ||
+        res.stage.toLowerCase().includes(activeSearch) ||
+        (res.rollNumbersSample && res.rollNumbersSample.some((r) => r.toLowerCase().includes(activeSearch)));
 
-    const matchesType = selectedType === 'ALL' || res.type === selectedType;
+      // Exam Filter
+      const matchesExam =
+        selectedExam === 'All Exams' ||
+        res.examTitle.toLowerCase().includes(selectedExam.toLowerCase()) ||
+        selectedExam.toLowerCase().includes(res.examTitle.toLowerCase());
 
-    const matchesZone =
-      selectedZoneFilter === 'ALL' || res.zoneCode === selectedZoneFilter;
+      // Year Filter
+      const matchesYear =
+        selectedYear === 'All Years' ||
+        Boolean(res.publishDate && res.publishDate.includes(selectedYear));
 
-    return matchesSearch && matchesType && matchesZone;
-  });
+      // Stage Filter
+      const matchesStage =
+        selectedStage === 'All Stages' ||
+        res.stage.toLowerCase().includes(selectedStage.toLowerCase()) ||
+        selectedStage.toLowerCase().includes(res.stage.toLowerCase());
+
+      // Type Filter
+      const matchesType = selectedType === 'ALL' || res.type === selectedType;
+
+      // Zone Filter
+      const matchesZone = selectedZone === 'ALL' || res.zoneCode === selectedZone;
+
+      return matchesSearch && matchesExam && matchesYear && matchesStage && matchesType && matchesZone;
+    });
+  }, [database.results, searchQuery, selectedExam, selectedYear, selectedStage, selectedType, selectedZone]);
+
+  // Selected Zone metadata for header info card
+  const activeZoneMeta = useMemo(() => {
+    if (!selectedZone || selectedZone === 'ALL') return null;
+    return database.zones.find((z) => z.code === selectedZone) || null;
+  }, [database.zones, selectedZone]);
+
+  const handleResetFilters = () => {
+    setSelectedExam('All Exams');
+    setSelectedYear('All Years');
+    setSelectedStage('All Stages');
+    setSelectedType('ALL');
+    setSelectedZone('ALL');
+    setSelectedZoneFilter('ALL');
+    setSearchQuery('');
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedZone !== 'ALL') {
+      setSelectedZoneFilter(selectedZone);
+    }
+    const el = document.getElementById('results-feed-list');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  // Count active filters
+  const activeFiltersCount = [
+    selectedExam !== 'All Exams',
+    selectedYear !== 'All Years',
+    selectedStage !== 'All Stages',
+    selectedType !== 'ALL',
+    selectedZone !== 'ALL',
+    Boolean(searchQuery.trim()),
+  ].filter(Boolean).length;
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Official Results & Merit Lists Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-        <div className="flex items-center space-x-3">
-          <div className="p-2.5 rounded-xl bg-purple-50 text-purple-700 border border-purple-100">
-            <Award className="w-5 h-5" />
-          </div>
-          <div>
-            <h2 className="text-lg sm:text-xl font-bold text-slate-950">
-              Official Merit Lists & Provisional Panels
-            </h2>
-            <p className="text-xs text-slate-500">
-              Download official PDF documents, merit lists, and replacement panels
-            </p>
-          </div>
+    <div className="space-y-6 pb-16 font-sans text-slate-900 animate-in fade-in">
+      
+      {/* 1. TOP TITLE HEADER */}
+      <div className="space-y-1">
+        <div className="flex items-center space-x-2.5">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-950">
+            RRB Results & Merit List Explorer
+          </h1>
+          <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-extrabold tracking-wide uppercase flex items-center space-x-1">
+            <Sparkles className="w-3 h-3 text-emerald-600" />
+            <span>Dynamic Engine</span>
+          </span>
         </div>
+        <p className="text-xs sm:text-sm text-slate-600 font-medium">
+          Official Merit Lists, Document Verification (DV) Shortlists, Provisional Panels & Scorecards across all 21 RRB Regional Boards
+        </p>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-          {/* Search */}
-          <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by CEN, exam, zone, roll number..."
-              className="w-full pl-9 pr-3 py-1.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-            />
+      {/* 2. DYNAMIC FILTER ENGINE CARD (Just like Cut-Off Explorer) */}
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-4">
+        <form onSubmit={handleFormSubmit} className="space-y-4">
+          
+          {/* Row 1: Select Post/Exam, Select Year, Select Zone, Select Stage, Select Result Type */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            
+            {/* 1. Select Post / Exam */}
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-1.5 flex items-center space-x-1">
+                <FileCheck2 className="w-3.5 h-3.5 text-blue-600" />
+                <span>Select Post / Exam</span>
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedExam}
+                  onChange={(e) => setSelectedExam(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
+                >
+                  {availableExams.map((exam) => (
+                    <option key={exam} value={exam}>
+                      {exam}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* 2. Select Year */}
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-1.5 flex items-center space-x-1">
+                <Calendar className="w-3.5 h-3.5 text-orange-600" />
+                <span>Select Year</span>
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
+                >
+                  {availableYears.map((yr) => (
+                    <option key={yr} value={yr}>
+                      {yr}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* 3. Select Zone */}
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-1.5 flex items-center space-x-1">
+                <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Select Zone / RRB Board</span>
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedZone}
+                  onChange={(e) => {
+                    setSelectedZone(e.target.value);
+                    setSelectedZoneFilter(e.target.value);
+                  }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
+                >
+                  <option value="ALL">All Regional RRB Boards</option>
+                  {database.zones.map((z) => (
+                    <option key={z.id} value={z.code}>
+                      {z.name} ({z.code})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* 4. Select Stage */}
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-1.5 flex items-center space-x-1">
+                <Layers className="w-3.5 h-3.5 text-purple-600" />
+                <span>Select Stage</span>
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedStage}
+                  onChange={(e) => setSelectedStage(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
+                >
+                  {availableStages.map((stg) => (
+                    <option key={stg} value={stg}>
+                      {stg}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* 5. Select Result Document Type */}
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-1.5 flex items-center space-x-1">
+                <Award className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Document Type</span>
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
+                >
+                  {resultTypes.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
+
           </div>
 
-          {/* Zone Selector */}
-          <div className="w-full sm:w-64">
-            <select
-              value={selectedZoneFilter}
-              onChange={(e) => setSelectedZoneFilter(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
-            >
-              <option value="ALL">All Regional RRB Boards</option>
-              {database.zones.map((z) => (
-                <option key={z.id} value={z.code}>
-                  {z.name} ({z.code})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+          {/* Row 2: Search Bar & Action Buttons */}
+          <div className="pt-2 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-3">
+            {/* Search Input Bar */}
+            <div className="relative w-full md:flex-1">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by Roll Number, CEN No, Candidate Name, or Post..."
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all font-medium"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
 
-        {/* Result Type Filters */}
-        <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100">
-          {resultTypes.map((t) => (
-            <button
-              key={t.value}
-              onClick={() => setSelectedType(t.value)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                selectedType === t.value
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+            {/* Quick Action Buttons */}
+            <div className="flex items-center space-x-2 w-full md:w-auto shrink-0">
+              <button
+                type="submit"
+                className="flex-1 md:flex-none px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-xs sm:text-sm transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center space-x-1.5 cursor-pointer"
+              >
+                <Search className="w-4 h-4" />
+                <span>Search Results</span>
+              </button>
+
+              {activeFiltersCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors flex items-center space-x-1 cursor-pointer"
+                  title="Reset all search filters"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Reset</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Result Type Filter Chips */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
+            <span className="text-[11px] font-bold text-slate-500 mr-1 flex items-center space-x-1">
+              <ListFilter className="w-3 h-3" />
+              <span>Quick Types:</span>
+            </span>
+            {resultTypes.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setSelectedType(t.value)}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  selectedType === t.value
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+        </form>
       </div>
 
-      {/* Results Feed List */}
+      {/* 3. REGIONAL RRB BOARD BADGE (When a specific zone is selected) */}
+      {activeZoneMeta && (
+        <div className="bg-gradient-to-r from-blue-50 via-indigo-50/50 to-white rounded-2xl p-4 border border-blue-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-white shadow-xs flex items-center justify-center p-1.5 border border-blue-200 shrink-0">
+              <RailwayLogo className="w-7 h-7" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="font-extrabold text-sm sm:text-base text-slate-900">
+                  {activeZoneMeta.name} ({activeZoneMeta.code})
+                </h3>
+                {activeZoneMeta.hindiName && (
+                  <span className="text-xs text-blue-800 font-semibold bg-blue-100 px-2 py-0.2 rounded-md">
+                    {activeZoneMeta.hindiName}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500">
+                Headquarters: {activeZoneMeta.headquarters} • Region: {activeZoneMeta.stateRegion}
+              </p>
+            </div>
+          </div>
+
+          <a
+            href={activeZoneMeta.officialWebsite}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold transition-colors shadow-2xs"
+          >
+            <span>Official Portal</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      )}
+
+      {/* 4. RESULTS MATCH COUNT STRIP */}
+      <div id="results-feed-list" className="flex items-center justify-between px-1">
+        <div className="flex items-center space-x-2">
+          <Award className="w-4 h-4 text-emerald-600" />
+          <h2 className="text-sm sm:text-base font-bold text-slate-900">
+            Official Declared Results ({filteredResults.length})
+          </h2>
+        </div>
+        {searchQuery.trim() && (
+          <span className="text-xs text-slate-500">
+            Matching keyword: <strong className="text-slate-900">"{searchQuery}"</strong>
+          </span>
+        )}
+      </div>
+
+      {/* 5. RESULTS LIST GRID */}
       {filteredResults.length === 0 ? (
-        <div className="p-12 text-center bg-white rounded-2xl border border-dashed border-slate-200">
-          <div className="w-14 h-14 rounded-2xl bg-purple-50 text-purple-700 flex items-center justify-center mx-auto mb-3">
+        <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-slate-300">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto mb-3 shadow-2xs">
             <Award className="w-7 h-7" />
           </div>
-          <h3 className="font-bold text-base sm:text-lg text-slate-900">
-            {database.results.length === 0 ? 'No Results or Provisional Panels Declared Yet' : 'No Results Found For This Filter'}
+          <h3 className="font-extrabold text-base sm:text-lg text-slate-900">
+            {database.results.length === 0 ? 'No Results or Provisional Panels Uploaded Yet' : 'No Results Found For This Filter'}
           </h3>
-          <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
             {database.results.length === 0
-              ? 'Official provisional panels, document verification lists, and merit lists will be published here upon official release.'
-              : 'Try clearing your search query or selecting "All Results".'}
+              ? 'Official provisional panels, document verification lists, and merit lists will appear here dynamically once uploaded via Admin Panel.'
+              : 'Try clearing your search query or selecting "All Regional RRB Boards" and "All Exams".'}
           </p>
 
           <div className="mt-5 flex flex-wrap justify-center gap-3">
             <button
               onClick={() => setCurrentTab('admin')}
-              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-xs"
+              className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-xs"
             >
-              Open Admin Panel
+              Open Admin Panel (Upload Data)
             </button>
-            {(searchQuery || selectedType !== 'ALL' || selectedZoneFilter !== 'ALL') && (
+            {activeFiltersCount > 0 && (
               <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setSelectedType('ALL');
-                  setSelectedZoneFilter('ALL');
-                }}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm transition-all cursor-pointer"
+                onClick={handleResetFilters}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm transition-all cursor-pointer"
               >
-                Reset Filters
+                Reset All Filters
               </button>
             )}
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
           {filteredResults.map((result) => {
             const activeSearchTerm = searchQuery.trim();
             const hasMatchedRoll = Boolean(
@@ -217,16 +549,16 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
             return (
               <div
                 key={result.id}
-                className={`p-5 rounded-2xl bg-white border transition-all flex flex-col justify-between ${
+                className={`p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white border transition-all flex flex-col justify-between ${
                   hasMatchedRoll
                     ? 'border-yellow-400 ring-2 ring-yellow-400/40 shadow-md bg-yellow-50/10'
-                    : 'border-slate-200 hover:border-slate-300 hover:shadow-xs'
+                    : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
                 }`}
               >
                 <div>
                   {/* Match Banner if Roll Number Matched */}
                   {hasMatchedRoll && (
-                    <div className="mb-3 px-3 py-1.5 rounded-lg bg-gradient-to-r from-yellow-300 via-amber-300 to-yellow-400 text-slate-950 font-bold text-xs flex items-center justify-between border border-yellow-500 shadow-xs">
+                    <div className="mb-3 px-3 py-1.5 rounded-xl bg-gradient-to-r from-yellow-300 via-amber-300 to-yellow-400 text-slate-950 font-bold text-xs flex items-center justify-between border border-yellow-500 shadow-xs">
                       <span className="flex items-center space-x-1.5">
                         <Sun className="w-4 h-4 text-amber-900" />
                         <span>Matching Roll Number Found in this Panel!</span>
@@ -237,13 +569,13 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                     </div>
                   )}
 
-                  {/* Header Pills */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  {/* Header Badges */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
                     <div className="flex items-center space-x-1.5">
-                      <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-slate-100 text-slate-800 border border-slate-200">
+                      <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold rounded-lg bg-slate-100 text-slate-800 border border-slate-200">
                         {result.cenNumber}
                       </span>
-                      <span className="px-2 py-0.5 text-[10px] font-semibold uppercase rounded bg-purple-50 text-purple-800 border border-purple-100">
+                      <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200">
                         {result.type}
                       </span>
                     </div>
@@ -253,36 +585,36 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                   </div>
 
                   {/* Exam Title & Stage */}
-                  <h3 className="font-bold text-base text-slate-950 leading-snug">
+                  <h3 className="font-extrabold text-base sm:text-lg text-slate-950 leading-snug">
                     {renderHighlightedText(result.examTitle, searchQuery)}
                   </h3>
-                  <div className="flex items-center space-x-2 text-xs text-slate-500 mt-1">
-                    <span className="font-medium text-slate-700">{result.zoneName}</span>
+                  <div className="flex items-center space-x-2 text-xs text-slate-500 mt-1 font-medium">
+                    <span className="font-bold text-slate-700">{result.zoneName}</span>
                     <span>•</span>
-                    <span className="text-slate-600 font-medium">{result.stage}</span>
+                    <span className="text-slate-600">{result.stage}</span>
                   </div>
 
                   {/* Candidate Count */}
                   {typeof result.totalSelectedCandidates === 'number' && (
-                    <div className="mt-3 inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-100 text-xs font-semibold">
+                    <div className="mt-3 inline-flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
                       <Users className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>{result.totalSelectedCandidates} Candidates Empanelled</span>
+                      <span>{result.totalSelectedCandidates.toLocaleString()} Candidates Empanelled</span>
                     </div>
                   )}
 
                   {/* Instructions */}
                   {result.instructions && (
-                    <p className="mt-3 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-200 leading-relaxed">
+                    <p className="mt-3 text-xs text-slate-600 bg-slate-50/80 p-3 rounded-xl border border-slate-200 leading-relaxed font-normal">
                       {renderHighlightedText(result.instructions, searchQuery)}
                     </p>
                   )}
 
-                  {/* Sample Roll Numbers Tag with Morning Sunlight Highlighting */}
+                  {/* Sample Roll Numbers Tag with Golden Highlighting */}
                   {result.rollNumbersSample && result.rollNumbersSample.length > 0 && (
-                    <div className="mt-3">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] text-slate-500 uppercase font-bold flex items-center space-x-1">
-                          <SearchCode className="w-3 h-3 text-amber-600" />
+                    <div className="mt-4 pt-3 border-t border-slate-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] text-slate-500 uppercase font-bold flex items-center space-x-1">
+                          <SearchCode className="w-3.5 h-3.5 text-amber-600" />
                           <span>Shortlisted Roll Numbers:</span>
                         </span>
                         <button
@@ -299,7 +631,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                       </div>
 
                       <div className="flex flex-wrap gap-1.5">
-                        {result.rollNumbersSample.slice(0, 5).map((r, i) => {
+                        {result.rollNumbersSample.slice(0, 4).map((r, i) => {
                           const isMatched = Boolean(
                             activeSearchTerm && r.toLowerCase().includes(activeSearchTerm.toLowerCase())
                           );
@@ -316,23 +648,23 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                           ) : (
                             <span
                               key={i}
-                              className="font-mono text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200"
+                              className="font-mono text-[11px] bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200"
                             >
                               {r}
                             </span>
                           );
                         })}
 
-                        {result.rollNumbersSample.length > 5 && (
+                        {result.rollNumbersSample.length > 4 && (
                           <button
                             type="button"
                             onClick={() => {
                               setActiveRollModalResult(result);
                               setRollModalSearch(searchQuery.trim());
                             }}
-                            className="text-[10px] font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded border border-slate-200 cursor-pointer transition-colors"
+                            className="text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg border border-slate-200 cursor-pointer transition-colors"
                           >
-                            +{result.rollNumbersSample.length - 5} more
+                            +{result.rollNumbersSample.length - 4} more
                           </button>
                         )}
                       </div>
@@ -340,9 +672,9 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                   )}
                 </div>
 
-                {/* Action Link */}
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400">Official RRB Release</span>
+                {/* Action Links */}
+                <div className="mt-4 pt-3.5 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-[11px] text-slate-400 font-medium">Official Railway Release</span>
                   <div className="flex items-center space-x-2">
                     {result.rollNumbersSample && result.rollNumbersSample.length > 0 && (
                       <button
@@ -350,7 +682,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                           setActiveRollModalResult(result);
                           setRollModalSearch(searchQuery.trim());
                         }}
-                        className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold text-xs transition-colors cursor-pointer border border-amber-200"
+                        className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs transition-colors cursor-pointer border border-amber-200"
                       >
                         <SearchCode className="w-3.5 h-3.5 text-amber-700" />
                         <span>Search Numbers</span>
@@ -367,7 +699,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                               text: result.instructions,
                             })
                           }
-                          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs transition-colors cursor-pointer"
+                          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition-colors cursor-pointer border border-slate-200"
                         >
                           <FileText className="w-3.5 h-3.5 text-purple-600" />
                           <span>PDF</span>
@@ -376,14 +708,14 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
                           href={result.fileUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition-colors shadow-xs"
+                          className="inline-flex items-center space-x-1 px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors shadow-xs"
                         >
                           <span>Open</span>
                           <ExternalLink className="w-3.5 h-3.5" />
                         </a>
                       </>
                     ) : (
-                      <span className="text-xs text-slate-500 font-medium">Published</span>
+                      <span className="text-xs text-slate-500 font-medium">Official Panel</span>
                     )}
                   </div>
                 </div>
@@ -393,11 +725,11 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
         </div>
       )}
 
-      {/* Full Roll Number Search & Explorer Modal */}
+      {/* 6. FULL ROLL NUMBER SEARCH & EXPLORER MODAL */}
       {activeRollModalResult && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
           <div 
-            className="relative bg-white w-full max-w-3xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[88vh]"
+            className="relative bg-white w-full max-w-3xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[88vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -426,21 +758,21 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
             {/* Modal Search Bar */}
             <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="relative w-full sm:w-96">
-                <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={rollModalSearch}
                   onChange={(e) => setRollModalSearch(e.target.value)}
                   placeholder="Instant roll number filter (e.g. 19119...)"
-                  className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs font-mono"
+                  className="w-full pl-10 pr-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs font-mono"
                   autoFocus
                 />
               </div>
 
               <div className="flex items-center space-x-2 text-xs text-slate-600 shrink-0">
-                <span className="inline-flex items-center space-x-1 bg-yellow-100 text-yellow-900 border border-yellow-300 px-2 py-1 rounded-lg font-semibold">
+                <span className="inline-flex items-center space-x-1 bg-yellow-100 text-yellow-900 border border-yellow-300 px-2 py-1 rounded-lg font-bold">
                   <Sun className="w-3.5 h-3.5 text-amber-700" />
-                  <span>Highlight: Morning Sunlight</span>
+                  <span>Highlight: Active Match</span>
                 </span>
                 <span className="font-medium">
                   Total: <strong>{activeRollModalResult.rollNumbersSample?.length || 0}</strong>
@@ -537,7 +869,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveRollModalResult(null)}
-                className="px-4 py-1.5 bg-white hover:bg-slate-200 border border-slate-300 rounded-lg text-slate-700 font-semibold transition-colors cursor-pointer"
+                className="px-4 py-1.5 bg-white hover:bg-slate-200 border border-slate-300 rounded-xl text-slate-700 font-bold transition-colors cursor-pointer"
               >
                 Close
               </button>
@@ -546,7 +878,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
         </div>
       )}
 
-      {/* PDF Viewer Modal */}
+      {/* 7. PDF VIEWER MODAL */}
       {activePdfPreview && (
         <PdfViewerModal
           isOpen={true}

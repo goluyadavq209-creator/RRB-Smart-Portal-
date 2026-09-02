@@ -6,14 +6,12 @@ interface RailwayTrainHeroBannerProps {
   onSearchSubmit?: (query: string) => void;
   onSelectTrendingExam?: (examShortCode: string) => void;
   onNavigateTab?: (tab: TabView) => void;
-  activeExamFilter?: string;
 }
 
 export const RailwayTrainHeroBanner: React.FC<RailwayTrainHeroBannerProps> = ({
   onSearchSubmit,
   onSelectTrendingExam,
   onNavigateTab,
-  activeExamFilter = 'ALL',
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -27,7 +25,7 @@ export const RailwayTrainHeroBanner: React.FC<RailwayTrainHeroBannerProps> = ({
   const trendingExams = ['RRB NTPC', 'RRB Group D', 'RRB Technician', 'RRB ALP'];
 
   return (
-    <div className="relative rounded-3xl overflow-hidden shadow-xl bg-[#09152b] border border-slate-800 text-white min-h-[380px] sm:min-h-[420px] flex items-center">
+    <div className="relative rounded-3xl overflow-hidden shadow-xl bg-[#09152b] border border-slate-800 text-white min-h-[460px] lg:min-h-[490px] flex items-center">
       {/* Background Indian Railways Locomotive Train Atmosphere */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         {/* Night / Dusk Railway Station Sky Gradient */}
@@ -163,63 +161,159 @@ export const RailwayTrainHeroBanner: React.FC<RailwayTrainHeroBannerProps> = ({
         <div className="absolute inset-0 bg-gradient-to-r from-[#071329] via-[#071329]/95 md:via-[#071329]/80 lg:via-[#071329]/40 to-transparent w-full lg:w-3/5" />
       </div>
 
-      {/* Hero Main Content */}
-      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-        <div className="max-w-3xl space-y-6">
-          <div>
-            {/* Hindi Big Headline */}
-            <h1 className="text-3xl sm:text-4xl lg:text-[44px] font-black text-white leading-[1.2] tracking-tight">
-              <span>Railway Exams की</span> <br />
-              <span className="text-white">पूरी जानकारी, एक ही जगह</span>
-            </h1>
+      {/* Hero Main Content Grid */}
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          {/* Left Column (7 cols): Headline, Search Box, Trending Pills */}
+          <div className="lg:col-span-7 space-y-6">
+            <div>
+              {/* Hindi Big Headline */}
+              <h1 className="text-3xl sm:text-4xl lg:text-[42px] font-black text-white leading-[1.2] tracking-tight">
+                <span>Railway Exams की</span> <br />
+                <span className="text-white">पूरी जानकारी, एक ही जगह</span>
+              </h1>
 
-            {/* Subtitle */}
-            <p className="text-xs sm:text-sm text-slate-300 font-normal mt-2.5 max-w-lg leading-relaxed">
-              Official updates for RRB NTPC, Group D, ALP & Technician. Instant Cut-Offs, Results & Direct Links.
-            </p>
-          </div>
-
-          {/* Main Search Input with Red Search Button */}
-          <form onSubmit={handleSearch} className="max-w-xl">
-            <div className="bg-white rounded-2xl p-1.5 flex items-center shadow-2xl border border-white/20">
-              <Search className="w-4 h-4 text-slate-400 ml-3 shrink-0" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search Exam, Vacancy, Cut Off, Result..."
-                className="w-full bg-transparent px-3 py-2 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="px-6 py-2.5 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] text-white text-xs sm:text-sm font-bold shadow-md transition-all cursor-pointer shrink-0"
-              >
-                Search
-              </button>
+              {/* Subtitle */}
+              <p className="text-xs sm:text-sm text-slate-300 font-normal mt-2.5 max-w-lg leading-relaxed">
+                All Information. One Platform. Your Success.
+              </p>
             </div>
-          </form>
 
-          {/* Trending Now Pills - Instant One-Exam Filter */}
-          <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-            <span className="text-slate-300 font-semibold mr-1">Trending Now :</span>
-            {trendingExams.map((exam) => {
-              const isActive = activeExamFilter === exam;
-              return (
+            {/* Main Search Input with Red Search Button */}
+            <form onSubmit={handleSearch} className="max-w-xl">
+              <div className="bg-white rounded-2xl p-1.5 flex items-center shadow-2xl border border-white/20">
+                <Search className="w-4 h-4 text-slate-400 ml-3 shrink-0" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search Exam, Vacancy, Cut Off, Result..."
+                  className="w-full bg-transparent px-3 py-2 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-[#c1121f] hover:bg-[#a50f1a] text-white text-xs sm:text-sm font-bold shadow-md transition-all cursor-pointer shrink-0"
+                >
+                  Search
+                </button>
+              </div>
+            </form>
+
+            {/* Trending Now Pills */}
+            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+              <span className="text-slate-300 font-semibold mr-1">Trending Now :</span>
+              {trendingExams.map((exam) => (
                 <button
                   key={exam}
                   type="button"
                   onClick={() => onSelectTrendingExam && onSelectTrendingExam(exam)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center space-x-1.5 ${
-                    isActive
-                      ? 'bg-[#c1121f] text-white border-2 border-red-400 shadow-md ring-2 ring-red-500/40 scale-105'
-                      : 'bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700'
-                  }`}
+                  className="px-3 py-1 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-semibold transition-all cursor-pointer shadow-xs"
                 >
-                  <span>{exam}</span>
-                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+                  {exam}
                 </button>
-              );
-            })}
+              ))}
+            </div>
+          </div>
+
+          {/* Right Column (5 cols): Official Candidate Services & Highlights */}
+          <div className="lg:col-span-5 flex justify-end">
+            <div className="w-full max-w-md bg-[#0b1b3d]/95 backdrop-blur-md rounded-3xl p-5 sm:p-6 border border-blue-500/30 shadow-2xl space-y-4 text-white relative overflow-hidden">
+              <div className="flex items-center justify-between pb-2 border-b border-blue-500/20">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-400 font-bold">
+                    <Bell className="w-5 h-5 text-red-400 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm sm:text-base text-white">
+                      Official RRB Live Updates
+                    </h3>
+                    <p className="text-[11px] text-blue-200">
+                      All 21 Railway Recruitment Boards
+                    </p>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-400/30">
+                  LIVE
+                </span>
+              </div>
+
+              {/* Quick Hub Links */}
+              <div className="space-y-2">
+                {[
+                  {
+                    title: 'Direct Roll Number Check',
+                    sub: 'Instant Result Verification (No Login Required)',
+                    tab: 'roll-check' as const,
+                    icon: CheckCircle2,
+                    badge: 'Instant',
+                    highlight: true,
+                  },
+                  {
+                    title: 'Exam Calendar & Syllabus',
+                    sub: 'NTPC, Group D, ALP & Technician',
+                    tab: 'exams' as const,
+                    icon: FileText,
+                    badge: 'Updated',
+                    highlight: false,
+                  },
+                  {
+                    title: 'Category-Wise Cut-Offs',
+                    sub: 'UR / OBC / SC / ST / EWS Normalized Scores',
+                    tab: 'cutoffs' as const,
+                    icon: BarChart3,
+                    badge: '21 Zones',
+                    highlight: false,
+                  },
+                  {
+                    title: 'CBT Results & Merit Lists',
+                    sub: 'Scorecards & Document Verification Lists',
+                    tab: 'results' as const,
+                    icon: Trophy,
+                    badge: 'Official',
+                    highlight: false,
+                  },
+                ].map((item) => (
+                  <button
+                    key={item.title}
+                    type="button"
+                    onClick={() => onNavigateTab && onNavigateTab(item.tab)}
+                    className={`w-full text-left p-3 rounded-2xl border flex items-center justify-between transition-all hover:scale-[1.01] cursor-pointer group ${
+                      item.highlight 
+                        ? 'bg-blue-600/30 hover:bg-blue-600/45 border-blue-400/50 shadow-sm' 
+                        : 'bg-white/10 hover:bg-white/15 border-white/10'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                        item.highlight ? 'bg-blue-500 text-white shadow-xs' : 'bg-blue-500/20 text-blue-300'
+                      }`}>
+                        <item.icon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors flex items-center space-x-1.5">
+                          <span>{item.title}</span>
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                            item.highlight ? 'bg-emerald-500 text-white' : 'bg-red-600/80 text-white'
+                          }`}>
+                            {item.badge}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-300 truncate max-w-[200px]">
+                          {item.sub}
+                        </div>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-amber-300 group-hover:translate-x-1 transition-all shrink-0" />
+                  </button>
+                ))}
+              </div>
+
+              {/* Trust Footer */}
+              <div className="pt-1 flex items-center justify-center space-x-1.5 text-[11px] text-slate-400">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Govt. of India • Ministry of Railways Portal</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
