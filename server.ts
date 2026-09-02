@@ -13,7 +13,12 @@ import {
   getSheetExports, 
   recordCandidateFeedback, 
   getAllFeedback, 
-  getDbStats 
+  getDbStats,
+  getPortalDatabaseFromDB,
+  savePortalDatabaseToDB,
+  getLiveNotifications,
+  createLiveNotificationRecord,
+  getDatabaseStatus
 } from './src/db/queries.ts';
 
 dotenv.config();
@@ -228,8 +233,100 @@ app.post('/api/gemini/chat', async (req, res) => {
 });
 
 // ==========================================
-// CLOUD SQL DATABASE ENDPOINTS
+// CLOUD SQL DATABASE ENDPOINTS & MULTI-USER SYNC
 // ==========================================
+
+// Get Full Central Portal Database for all users
+app.get('/api/database', async (req, res) => {
+  try {
+    const result = await getPortalDatabaseFromDB();
+    if (!result) {
+      return res.json({
+        exists: false,
+        data: null,
+        version: 'initial',
+        message: 'No custom database saved in Cloud SQL yet',
+      });
+    }
+    return res.json({
+      exists: true,
+      data: result.data,
+      version: result.version,
+      updatedAt: result.updatedAt,
+      updatedBy: result.updatedBy,
+    });
+  } catch (error: any) {
+    console.error('Error fetching portal database from Cloud SQL:', error);
+    return res.status(500).json({ error: error.message || 'Failed to fetch database' });
+  }
+});
+
+// Save or Update Full Central Portal Database (Called when Admin updates any links/data)
+app.post('/api/database', async (req, res) => {
+  try {
+    const { database, updatedBy, notification } = req.body;
+    if (!database) {
+      return res.status(400).json({ error: 'Database payload is required' });
+    }
+
+    const saveResult = await savePortalDatabaseToDB(
+      database,
+      updatedBy || 'Admin',
+      notification
+    );
+
+    return res.json({
+      success: true,
+      message: 'Portal database successfully saved in Cloud SQL and broadcasted to all users.',
+      version: saveResult.record.version,
+      updatedAt: saveResult.record.updatedAt,
+      notification: saveResult.notification,
+    });
+  } catch (error: any) {
+    console.error('Error saving portal database to Cloud SQL:', error);
+    return res.status(500).json({ error: error.message || 'Failed to save database' });
+  }
+});
+
+// Fast Status / Version Check for Live Polling across all connected users
+app.get('/api/database/status', async (req, res) => {
+  try {
+    const status = await getDatabaseStatus();
+    return res.json(status);
+  } catch (error: any) {
+    return res.json({
+      version: 'initial',
+      updatedAt: null,
+      updatedBy: 'System',
+      latestNotification: null,
+    });
+  }
+});
+
+// Fetch Live Broadcast Notifications
+app.get('/api/database/notifications', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 15;
+    const notifications = await getLiveNotifications(limit);
+    return res.json({ success: true, notifications });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Failed to fetch notifications' });
+  }
+});
+
+// Create Manual Admin Notification Broadcast
+app.post('/api/database/notify', async (req, res) => {
+  try {
+    const { title, message, category, targetTab, linkUrl } = req.body;
+    if (!title || !message) {
+      return res.status(400).json({ error: 'Title and message are required' });
+    }
+    const notif = await createLiveNotificationRecord(title, message, category, targetTab, linkUrl);
+    return res.json({ success: true, notification: notif });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Failed to broadcast notification' });
+  }
+});
 
 // Synchronize authenticated user to Cloud SQL
 app.post('/api/db/sync-user', requireAuth, async (req: AuthRequest, res) => {

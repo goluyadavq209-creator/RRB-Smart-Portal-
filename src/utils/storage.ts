@@ -65,14 +65,61 @@ export function loadRRBDatabase(): FullRRBDatabase {
   }
 }
 
-export function saveRRBDatabase(data: FullRRBDatabase): boolean {
+export interface ServerSyncNotificationInfo {
+  title?: string;
+  message?: string;
+  category?: string;
+  targetTab?: string;
+  linkUrl?: string;
+}
+
+export async function syncWithServerDatabase(): Promise<FullRRBDatabase | null> {
   try {
+    const response = await fetch('/api/database');
+    if (!response.ok) return null;
+    const json = await response.json();
+    if (json.exists && json.data) {
+      const serverDb = json.data as FullRRBDatabase;
+      // Sanitize arrays
+      const exams = (Array.isArray(serverDb.exams) ? serverDb.exams : []).filter(Boolean);
+      const cutoffs = (Array.isArray(serverDb.cutoffs) ? serverDb.cutoffs : []).filter(Boolean);
+      const notices = (Array.isArray(serverDb.notices) ? serverDb.notices : []).filter(Boolean);
+      const results = (Array.isArray(serverDb.results) ? serverDb.results : []).filter(Boolean);
+      const portalLinks = (Array.isArray(serverDb.portalLinks) ? serverDb.portalLinks : []).filter(Boolean);
+      const candidateScorecards = (Array.isArray(serverDb.candidateScorecards) ? serverDb.candidateScorecards : []).filter(Boolean);
+
+      const normalizedDb: FullRRBDatabase = {
+        metadata: serverDb.metadata || INITIAL_EMPTY_DATABASE.metadata,
+        settings: serverDb.settings || INITIAL_EMPTY_DATABASE.settings,
+        zones: Array.isArray(serverDb.zones) && serverDb.zones.length > 0 ? serverDb.zones : OFFICIAL_RRB_ZONES,
+        exams,
+        cutoffs,
+        notices,
+        results,
+        portalLinks,
+        candidateScorecards,
+      };
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedDb));
+      saveToIndexedDBVault(normalizedDb).catch(() => {});
+      return normalizedDb;
+    }
+    return null;
+  } catch (err) {
+    console.debug('Failed to sync database from Cloud SQL server:', err);
+    return null;
+  }
+}
+
+export function saveRRBDatabase(data: FullRRBDatabase, notificationInfo?: ServerSyncNotificationInfo): boolean {
+  try {
+    const nowIso = new Date().toISOString();
     const dataToSave: FullRRBDatabase = {
       ...data,
       metadata: {
         ...data.metadata,
         version: '4.0.0-EMPTY',
-        lastUpdated: new Date().toISOString(),
+        lastUpdated: nowIso,
       },
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
@@ -80,6 +127,34 @@ export function saveRRBDatabase(data: FullRRBDatabase): boolean {
     // Save to 1TB IndexedDB High-Capacity Vault asynchronously
     saveToIndexedDBVault(dataToSave).catch((err) => {
       console.warn('1TB IndexedDB background sync warning:', err);
+    });
+
+    // Notify local listeners
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('rrb_database_updated', { detail: { database: dataToSave } }));
+    }
+
+    // Persist to Cloud SQL PostgreSQL Server so ALL other users instantly receive it!
+    fetch('/api/database', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        database: dataToSave,
+        updatedBy: 'Admin',
+        notification: notificationInfo || {
+          title: '📢 RRB Portal Updated by Admin',
+          message: 'New candidate direct links, answer keys, notices, and cut-off marks have been updated.',
+          category: 'notice',
+          targetTab: 'notices'
+        }
+      }),
+    }).then(async (res) => {
+      if (res.ok) {
+        const resData = await res.json();
+        console.log('✅ Central Cloud SQL database synced successfully:', resData.version);
+      }
+    }).catch((err) => {
+      console.warn('Cloud SQL database server sync warning:', err);
     });
 
     return true;

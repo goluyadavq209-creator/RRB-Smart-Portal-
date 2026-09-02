@@ -14,7 +14,7 @@ import {
   Bot
 } from 'lucide-react';
 import { FullRRBDatabase, TabView } from './types';
-import { loadRRBDatabase, saveRRBDatabase, exportEmptySchemaJson } from './utils/storage';
+import { loadRRBDatabase, saveRRBDatabase, syncWithServerDatabase, exportEmptySchemaJson } from './utils/storage';
 import { checkAdminSession, logoutAdmin } from './utils/auth';
 import { TopGovBar } from './components/TopGovBar';
 import { Navbar } from './components/Navbar';
@@ -47,10 +47,61 @@ export default function App() {
   const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('base');
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // Sync state to local storage if updated
+  // Initial sync from central Cloud SQL PostgreSQL database on load
   useEffect(() => {
-    saveRRBDatabase(database);
-  }, [database]);
+    syncWithServerDatabase().then((serverDb) => {
+      if (serverDb) {
+        setDatabase(serverDb);
+      }
+    });
+  }, []);
+
+  // Real-time live polling from Cloud SQL to broadcast updates to all active users
+  useEffect(() => {
+    let lastKnownTimestamp = '';
+    let lastNotifId = 0;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/database/status');
+        if (!res.ok) return;
+        const status = await res.json();
+
+        // If Cloud SQL server timestamp has changed, update client database seamlessly
+        if (status.updatedAt && status.updatedAt !== lastKnownTimestamp) {
+          lastKnownTimestamp = status.updatedAt;
+          const freshDb = await syncWithServerDatabase();
+          if (freshDb) {
+            setDatabase(freshDb);
+          }
+        }
+
+        // If a new live notification was logged, show immediate 3-second popup alert
+        if (status.latestNotification && status.latestNotification.id && status.latestNotification.id !== lastNotifId) {
+          lastNotifId = status.latestNotification.id;
+          
+          window.dispatchEvent(new CustomEvent('rrb_notifications_updated', {
+            detail: {
+              notification: {
+                id: `server-notif-${status.latestNotification.id}`,
+                title: status.latestNotification.title,
+                message: status.latestNotification.message,
+                category: status.latestNotification.category || 'notice',
+                targetTab: status.latestNotification.targetTab || 'notices',
+                timestamp: status.latestNotification.createdAt,
+                read: false,
+                badgeText: 'Live Update',
+              }
+            }
+          }));
+        }
+      } catch (err) {
+        // Silent catch for polling
+      }
+    }, 4000); // 4 seconds polling for instantaneous user updates
+
+    return () => clearInterval(pollInterval);
+  }, []);
 
   // Support direct URL hash (#admin) or query parameter (?admin) for administrator access
   useEffect(() => {

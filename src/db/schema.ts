@@ -11,6 +11,27 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// Central Shared Portal Database stored in Cloud SQL PostgreSQL for all users
+export const portalDatabase = pgTable('portal_database', {
+  id: serial('id').primaryKey(),
+  key: text('key').notNull().unique(), // e.g. 'main_rrb_database'
+  data: text('data').notNull(), // Full JSON string of FullRRBDatabase
+  version: text('version').notNull().default('4.0.0-EMPTY'),
+  updatedBy: text('updated_by').default('Admin'),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Live Multi-User Notifications broadcasted in real-time
+export const liveNotifications = pgTable('live_notifications', {
+  id: serial('id').primaryKey(),
+  title: text('title').notNull(),
+  message: text('message').notNull(),
+  category: text('category').default('notice'), // 'notice' | 'cutoff' | 'result' | 'exam' | 'link' | 'admin'
+  targetTab: text('target_tab').default('notices'),
+  linkUrl: text('link_url'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 // Google Form Exports created by users
 export const formExports = pgTable('form_exports', {
   id: serial('id').primaryKey(),

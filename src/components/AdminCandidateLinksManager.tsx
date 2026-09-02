@@ -20,6 +20,7 @@ import {
 import { CandidatePortalLink, FullRRBDatabase, PortalLinkType, OFFICIAL_RRB_DIGIALM_LOGIN_URL } from '../types';
 import { saveRRBDatabase } from '../utils/storage';
 import { DEFAULT_CANDIDATE_PORTAL_LINKS } from '../data/defaultData';
+import { dispatchNewDataNotification } from '../utils/notifications';
 
 interface AdminCandidateLinksManagerProps {
   database: FullRRBDatabase;
@@ -145,8 +146,25 @@ export const AdminCandidateLinksManager: React.FC<AdminCandidateLinksManagerProp
       portalLinks: updatedLinks,
     };
 
-    saveRRBDatabase(updatedDb);
+    const notificationPayload = {
+      title: `🔗 ${formData.title.trim()}`,
+      message: `${formData.examName ? `[${formData.examName}] ` : ''}${formData.notes || 'Official Railway Candidate Portal link is now active.'}`,
+      category: 'link' as const,
+      targetTab: 'home' as const,
+      linkUrl: formData.url.trim(),
+    };
+
+    saveRRBDatabase(updatedDb, notificationPayload);
     setDatabase(updatedDb);
+
+    dispatchNewDataNotification({
+      title: `🔗 ${formData.title.trim()}`,
+      message: `${formData.examName ? `[${formData.examName}] ` : ''}${formData.notes || 'Official direct candidate link is now live on the portal.'}`,
+      category: 'notice',
+      targetTab: 'home',
+      badgeText: formData.badgeText || 'Direct Link',
+    });
+
     resetForm();
   };
 
