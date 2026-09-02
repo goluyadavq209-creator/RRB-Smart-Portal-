@@ -222,7 +222,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <span>Dashboard</span>
             </button>
 
-            {/* 2. Website Analytics */}
+            {/* 2. RRB Auto Sync & Publish Engine (OFFICIAL RRB SYNC) */}
+            <button
+              onClick={() => { setActiveTab('auto_update'); setSidebarOpen(false); }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all cursor-pointer ${
+                activeTab === 'auto_update'
+                  ? 'bg-red-600 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <div className="flex items-center">
+                <RefreshCw className="w-4 h-4 mr-3 shrink-0 text-amber-400" />
+                <span>RRB Auto Sync Engine</span>
+              </div>
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-red-950 text-red-300 border border-red-800">
+                LIVE
+              </span>
+            </button>
+
+            {/* 3. Website Analytics */}
             <button
               onClick={() => { setActiveTab('analytics'); setSidebarOpen(false); }}
               className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-all cursor-pointer ${
@@ -606,6 +624,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           {activeTab === 'auto_update' && (
             <AdminAutoUpdateView
               database={database}
+              setDatabase={setDatabase}
               onSuccessMessage={showToast}
             />
           )}

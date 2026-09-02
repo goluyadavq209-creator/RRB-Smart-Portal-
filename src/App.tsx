@@ -103,6 +103,12 @@ export default function App() {
     return () => clearInterval(pollInterval);
   }, []);
 
+  // Central Database mutation handler for Admin actions
+  const handleDatabaseUpdate = (newDb: FullRRBDatabase) => {
+    setDatabase(newDb);
+    saveRRBDatabase(newDb);
+  };
+
   // Support direct URL hash (#admin) or query parameter (?admin) for administrator access
   useEffect(() => {
     const checkAdminHash = () => {
@@ -329,7 +335,7 @@ export default function App() {
           ) : (
             <AdminPanel
               database={database}
-              setDatabase={setDatabase}
+              setDatabase={handleDatabaseUpdate}
               setCurrentTab={handleNavigate}
               onLogout={handleAdminLogout}
             />

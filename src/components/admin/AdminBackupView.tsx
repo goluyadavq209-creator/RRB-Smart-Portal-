@@ -16,17 +16,15 @@ import {
   Clock,
   Layers,
   BarChart3,
-  Lock
+  Lock,
+  ArrowUpRight,
+  AlertCircle,
+  Globe,
+  Radio
 } from 'lucide-react';
 import { FullRRBDatabase } from '../../types';
-import { exportDatabaseAsJson, validateAndParseRRBJson, loadSampleDataset } from '../../utils/storage';
-import { 
-  getStorageMemoryAnalytics, 
-  StorageMemoryStats, 
-  createIndexedDBSnapshot, 
-  listIndexedDBSnapshots, 
-  requestPersistentStorage 
-} from '../../utils/indexedDbStorage';
+import { exportDatabaseAsJson, validateAndParseRRBJson, loadSampleDataset, saveRRBDatabase, migrateLocalToCloudDatabase } from '../../utils/storage';
+import { dbService, MigrationReport } from '../../services/dbService';
 
 interface AdminBackupViewProps {
   database: FullRRBDatabase;
@@ -36,186 +34,224 @@ interface AdminBackupViewProps {
 
 export const AdminBackupView: React.FC<AdminBackupViewProps> = ({ database, setDatabase, onSuccessMessage }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [stats, setStats] = useState<StorageMemoryStats | null>(null);
-  const [snapshots, setSnapshots] = useState<any[]>([]);
-  const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false);
-  const [isRequestingPersist, setIsRequestingPersist] = useState(false);
-  const [snapshotName, setSnapshotName] = useState('');
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationReport, setMigrationReport] = useState<MigrationReport | null>(null);
+  const [cloudStatus, setCloudStatus] = useState<{ version: string; updatedAt: string | null; updatedBy: string } | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const refreshStats = async () => {
+  const fetchCloudStatus = async () => {
+    setIsRefreshing(true);
     try {
-      const s = await getStorageMemoryAnalytics(database);
-      setStats(s);
-      const snaps = await listIndexedDBSnapshots();
-      setSnapshots(snaps);
+      const res = await dbService.fetchDatabase();
+      if (res.data) {
+        setDatabase(res.data);
+      }
+      setCloudStatus({
+        version: res.version,
+        updatedAt: res.updatedAt,
+        updatedBy: res.updatedBy,
+      });
     } catch (e) {
-      console.warn(e);
+      console.warn('Could not refresh Cloud SQL status:', e);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
-    refreshStats();
-  }, [database]);
+    fetchCloudStatus();
+  }, []);
 
   const handleExport = () => {
-    exportDatabaseAsJson(database, `rrb_database_backup_1tb_vault_${new Date().toISOString().split('T')[0]}.json`);
-    onSuccessMessage('Full 1 TB Database JSON export downloaded successfully.');
+    exportDatabaseAsJson(database, `rrb_cloud_database_backup_${new Date().toISOString().split('T')[0]}.json`);
+    onSuccessMessage('Central Database JSON export downloaded successfully.');
   };
 
-  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const text = event.target?.result as string;
         const validation = validateAndParseRRBJson(text);
         if (validation.isValid && validation.parsedData) {
-          setDatabase(validation.parsedData);
-          onSuccessMessage(`Database restored successfully (${validation.parsedData.cutoffs.length} cutoffs, ${validation.parsedData.exams.length} exams).`);
-          refreshStats();
+          setIsMigrating(true);
+          const report = await migrateLocalToCloudDatabase(validation.parsedData);
+          setIsMigrating(false);
+          setMigrationReport(report);
+          if (report.success) {
+            setDatabase(validation.parsedData);
+            onSuccessMessage(`Database migrated & persisted to Cloud SQL (${report.migratedCounts.total} total records).`);
+            fetchCloudStatus();
+          } else {
+            alert(`Migration to Cloud SQL failed: ${report.error}`);
+          }
         } else {
           alert(`Invalid JSON format: ${validation.errors.join(', ')}`);
         }
       } catch (err: any) {
+        setIsMigrating(false);
         alert(`Failed to import JSON backup: ${err.message}`);
       }
     };
     reader.readAsText(file);
   };
 
-  const handleCreateSnapshot = async () => {
-    setIsCreatingSnapshot(true);
-    const label = snapshotName.trim() || `Auto-Snapshot (${new Date().toLocaleTimeString()})`;
-    const success = await createIndexedDBSnapshot(database, label);
-    if (success) {
-      onSuccessMessage(`1 TB Storage Snapshot "${label}" preserved in permanent IndexedDB Vault.`);
-      setSnapshotName('');
-      refreshStats();
-    } else {
-      alert('Could not create snapshot in local storage.');
+  const handleRunCloudMigration = async () => {
+    setIsMigrating(true);
+    try {
+      const report = await migrateLocalToCloudDatabase(database);
+      setMigrationReport(report);
+      if (report.success) {
+        onSuccessMessage(`Cloud SQL Database Synced: ${report.migratedCounts.total} records saved, ${report.duplicatesRemoved} duplicates pruned.`);
+        fetchCloudStatus();
+      } else {
+        alert(`Cloud Migration failed: ${report.error}`);
+      }
+    } catch (err: any) {
+      alert(`Migration error: ${err.message}`);
+    } finally {
+      setIsMigrating(false);
     }
-    setIsCreatingSnapshot(false);
   };
 
-  const handleGrantPersistence = async () => {
-    setIsRequestingPersist(true);
-    const granted = await requestPersistentStorage();
-    if (granted) {
-      onSuccessMessage('Persistent Uncapped Storage quota granted by browser.');
-    } else {
-      onSuccessMessage('Storage already active or governed by browser quota.');
-    }
-    refreshStats();
-    setIsRequestingPersist(false);
-  };
-
-  const handleReset = () => {
-    if (window.confirm('Are you sure you want to reset the database to sample official template?')) {
+  const handleReset = async () => {
+    if (window.confirm('Are you sure you want to reset the Central Database to standard official RRB sample records in Cloud SQL?')) {
       const def = loadSampleDataset();
       setDatabase(def);
-      onSuccessMessage('Database reset to official default data records.');
-      refreshStats();
+      await saveRRBDatabase(def, {
+        title: '🔄 RRB Database Initialized',
+        message: 'Central portal database reset to standard Railway Board template.',
+        category: 'admin',
+        targetTab: 'home',
+      });
+      onSuccessMessage('Database reset to official default data records in Cloud SQL.');
+      fetchCloudStatus();
     }
   };
 
-  const handleRestoreSnapshot = (snap: any) => {
-    if (snap && snap.data) {
-      if (window.confirm(`Restore portal database to snapshot created at ${new Date(snap.createdAt).toLocaleString()}?`)) {
-        setDatabase(snap.data);
-        onSuccessMessage(`Restored snapshot "${snap.name || 'Backup'}" successfully!`);
-        refreshStats();
-      }
-    }
-  };
+  const totalRecords = (database.cutoffs?.length || 0) + 
+                       (database.exams?.length || 0) + 
+                       (database.notices?.length || 0) + 
+                       (database.results?.length || 0) + 
+                       (database.portalLinks?.length || 0);
 
   return (
     <div className="space-y-6 animate-in fade-in">
-      {/* 1. TOP HEADER WITH 1 TB VAULT BANNER */}
+      {/* 1. TOP HEADER WITH CLOUD SQL DATABASE BANNER */}
       <div className="p-6 rounded-3xl bg-gradient-to-r from-[#071739] via-[#0b2b68] to-[#04112c] text-white shadow-xl border border-blue-900/50">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5">
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-xs font-bold text-blue-200 uppercase tracking-wider">
-              <Database className="w-3.5 h-3.5 text-blue-300" />
-              <span>1 TB High-Capacity Storage Vault</span>
+            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-xs font-bold text-emerald-300 uppercase tracking-wider">
+              <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <span>Central Cloud SQL PostgreSQL Database Active</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center space-x-2.5">
-              <span>1 TB Persistent Memory Engine</span>
+              <span>Cloud Database & Multi-User Synchronization</span>
             </h2>
             <p className="text-xs sm:text-sm text-blue-200 font-medium max-w-2xl">
-              All 21 RRB regional cutoffs, CEN exam notifications, official result lists, candidate response sheets, and multi-version snapshots are permanently retained with IndexedDB high-capacity quota.
+              All 21 RRB regional cutoffs, exams, admit card links, and notices are permanently persisted in the cloud database. Any data created, edited, or deleted in the admin panel is instantly broadcasted to all users across all devices and browsers.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
             <button
               type="button"
-              onClick={handleGrantPersistence}
-              disabled={isRequestingPersist}
-              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer border border-emerald-400/30"
+              onClick={handleRunCloudMigration}
+              disabled={isMigrating}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold flex items-center space-x-2 shadow-sm transition-all cursor-pointer border border-blue-400/30 disabled:opacity-50"
             >
-              <ShieldCheck className="w-4 h-4" />
-              <span>{stats?.isPersistentGranted ? 'Persistent Storage Active ✅' : 'Enable High-Quota Persist'}</span>
+              <Zap className="w-4 h-4 text-yellow-300" />
+              <span>{isMigrating ? 'Migrating to Cloud SQL...' : 'Sync & Migrate to Cloud'}</span>
             </button>
 
             <button
               type="button"
-              onClick={refreshStats}
+              onClick={fetchCloudStatus}
+              disabled={isRefreshing}
               className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-              title="Refresh Storage Metrics"
+              title="Refresh Cloud SQL Status"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
 
-        {/* Storage Bar Visualizer */}
-        {stats && (
-          <div className="mt-6 pt-5 border-t border-white/10 grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="p-3.5 bg-white/5 rounded-2xl border border-white/10">
-              <span className="text-[11px] text-blue-200 font-bold block uppercase tracking-wider">
-                Total Allocated Capacity
-              </span>
-              <div className="text-2xl font-black text-white font-mono mt-0.5">
-                1.00 TB <span className="text-xs text-blue-300 font-normal">Quota</span>
-              </div>
-              <span className="text-[10px] text-emerald-400 font-medium">Uncapped Browser Storage</span>
+        {/* Database Status Bar */}
+        <div className="mt-6 pt-5 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-3.5 bg-white/5 rounded-2xl border border-white/10">
+            <span className="text-[11px] text-blue-200 font-bold block uppercase tracking-wider">
+              Database Provider
+            </span>
+            <div className="text-xl font-black text-white font-mono mt-0.5">
+              Cloud SQL <span className="text-xs text-blue-300 font-normal">PostgreSQL</span>
             </div>
-
-            <div className="p-3.5 bg-white/5 rounded-2xl border border-white/10">
-              <span className="text-[11px] text-blue-200 font-bold block uppercase tracking-wider">
-                Memory In Use
-              </span>
-              <div className="text-2xl font-black text-amber-300 font-mono mt-0.5">
-                {stats.usedFormatted}
-              </div>
-              <span className="text-[10px] text-blue-200 font-medium">Auto-compressed Vault</span>
-            </div>
-
-            <div className="p-3.5 bg-white/5 rounded-2xl border border-white/10">
-              <span className="text-[11px] text-blue-200 font-bold block uppercase tracking-wider">
-                Total Database Records
-              </span>
-              <div className="text-2xl font-black text-sky-300 font-mono mt-0.5">
-                {stats.recordsCount.cutoffs + stats.recordsCount.exams + stats.recordsCount.results + stats.recordsCount.notices + stats.recordsCount.rollNumbers}
-              </div>
-              <span className="text-[10px] text-blue-200 font-medium">Across all 21 Zones</span>
-            </div>
-
-            <div className="p-3.5 bg-white/5 rounded-2xl border border-white/10">
-              <span className="text-[11px] text-blue-200 font-bold block uppercase tracking-wider">
-                Vault Status
-              </span>
-              <div className="text-lg font-black text-emerald-400 mt-1 flex items-center space-x-1.5">
-                <Lock className="w-4 h-4" />
-                <span>100% Safe & Synced</span>
-              </div>
-              <span className="text-[10px] text-blue-200 font-medium">IndexedDB + Local Fallback</span>
-            </div>
+            <span className="text-[10px] text-emerald-400 font-medium">asia-southeast1 Managed</span>
           </div>
-        )}
+
+          <div className="p-3.5 bg-white/5 rounded-2xl border border-white/10">
+            <span className="text-[11px] text-blue-200 font-bold block uppercase tracking-wider">
+              Total Live Records
+            </span>
+            <div className="text-2xl font-black text-amber-300 font-mono mt-0.5">
+              {totalRecords}
+            </div>
+            <span className="text-[10px] text-blue-200 font-medium">Exams, Cut-offs, Notices & Links</span>
+          </div>
+
+          <div className="p-3.5 bg-white/5 rounded-2xl border border-white/10">
+            <span className="text-[11px] text-blue-200 font-bold block uppercase tracking-wider">
+              Last Cloud Sync
+            </span>
+            <div className="text-sm font-black text-sky-300 font-mono mt-1 truncate">
+              {cloudStatus?.updatedAt ? new Date(cloudStatus.updatedAt).toLocaleTimeString() : 'Live'}
+            </div>
+            <span className="text-[10px] text-blue-200 font-medium">By {cloudStatus?.updatedBy || 'Admin'}</span>
+          </div>
+
+          <div className="p-3.5 bg-white/5 rounded-2xl border border-white/10">
+            <span className="text-[11px] text-blue-200 font-bold block uppercase tracking-wider">
+              Broadcast Status
+            </span>
+            <div className="text-sm font-black text-emerald-400 mt-1 flex items-center space-x-1.5">
+              <Globe className="w-4 h-4" />
+              <span>Realtime Poller Active</span>
+            </div>
+            <span className="text-[10px] text-blue-200 font-medium">All connected clients synced</span>
+          </div>
+        </div>
       </div>
+
+      {/* Migration Report Alert (If available) */}
+      {migrationReport && (
+        <div className={`p-5 rounded-2xl border flex items-start space-x-3.5 animate-in fade-in ${
+          migrationReport.success ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-rose-50 border-rose-200 text-rose-950'
+        }`}>
+          {migrationReport.success ? (
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          ) : (
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+          )}
+          <div className="flex-1 text-xs">
+            <h4 className="font-bold text-sm">
+              {migrationReport.success ? 'Cloud Migration Completed Successfully!' : 'Cloud Migration Error'}
+            </h4>
+            <p className="mt-1 text-slate-600 leading-relaxed">
+              {migrationReport.success ? (
+                <>
+                  Persisted <strong>{migrationReport.migratedCounts.total}</strong> records into Cloud SQL PostgreSQL:
+                  {' '}{migrationReport.migratedCounts.exams} Exams, {migrationReport.migratedCounts.cutoffs} Cut-offs, {migrationReport.migratedCounts.notices} Notices, and {migrationReport.migratedCounts.portalLinks} Candidate Portal Links. 
+                  {' '}(<strong>{migrationReport.duplicatesRemoved}</strong> duplicate entries safely pruned).
+                </>
+              ) : (
+                migrationReport.error
+              )}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* 2. THREE CORE ACTION CARDS: EXPORT, IMPORT, RESET */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
@@ -225,9 +261,9 @@ export const AdminBackupView: React.FC<AdminBackupViewProps> = ({ database, setD
             <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center shadow-xs">
               <Download className="w-6 h-6" />
             </div>
-            <h3 className="font-bold text-sm text-slate-900">Download Full JSON Backup</h3>
+            <h3 className="font-bold text-sm text-slate-900">Download Full Database JSON</h3>
             <p className="text-slate-500 text-xs leading-relaxed">
-              Export entire database including all 21 RRB regional cut-offs, CEN notifications, notices, roll numbers, and official portal links into a portable JSON snapshot.
+              Export the entire Cloud SQL database including all 21 RRB regional cut-offs, CEN notifications, notices, roll numbers, and official candidate portal links.
             </p>
           </div>
           <button
@@ -239,15 +275,15 @@ export const AdminBackupView: React.FC<AdminBackupViewProps> = ({ database, setD
           </button>
         </div>
 
-        {/* Restore Card */}
+        {/* Restore & Migrate Card */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between hover:border-emerald-300 transition-all">
           <div className="space-y-2">
             <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center shadow-xs">
               <Upload className="w-6 h-6" />
             </div>
-            <h3 className="font-bold text-sm text-slate-900">Restore from Backup File</h3>
+            <h3 className="font-bold text-sm text-slate-900">Import & Migrate to Cloud</h3>
             <p className="text-slate-500 text-xs leading-relaxed">
-              Upload a previously exported database JSON file. Automatically validates format and injects records into the 1 TB persistent vault.
+              Upload a database JSON file. Automatically validates format, eliminates duplicate records, and syncs directly into the central Cloud SQL PostgreSQL database.
             </p>
           </div>
           <input
@@ -259,10 +295,11 @@ export const AdminBackupView: React.FC<AdminBackupViewProps> = ({ database, setD
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-2xl shadow-sm transition-all cursor-pointer flex items-center justify-center space-x-2"
+            disabled={isMigrating}
+            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold rounded-2xl shadow-sm transition-all cursor-pointer flex items-center justify-center space-x-2 disabled:opacity-50"
           >
             <Upload className="w-4 h-4" />
-            <span>Import / Restore JSON</span>
+            <span>{isMigrating ? 'Migrating...' : 'Import & Save to Cloud SQL'}</span>
           </button>
         </div>
 
@@ -272,9 +309,9 @@ export const AdminBackupView: React.FC<AdminBackupViewProps> = ({ database, setD
             <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center shadow-xs">
               <RotateCcw className="w-6 h-6" />
             </div>
-            <h3 className="font-bold text-sm text-slate-900">Reset to Default Data</h3>
+            <h3 className="font-bold text-sm text-slate-900">Reset to Standard RRB Dataset</h3>
             <p className="text-slate-500 text-xs leading-relaxed">
-              Re-seed standard official RRB NTPC, ALP, Group D, Technician exams, official Malda cutoffs, and 21 Regional Boards.
+              Re-seed standard official RRB NTPC, ALP, Group D, Technician exams, official cutoffs, and 21 Regional Boards directly into Cloud SQL.
             </p>
           </div>
           <button
@@ -282,80 +319,11 @@ export const AdminBackupView: React.FC<AdminBackupViewProps> = ({ database, setD
             className="w-full py-3 bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-700 font-bold rounded-2xl border border-slate-200 transition-all cursor-pointer flex items-center justify-center space-x-2"
           >
             <RotateCcw className="w-4 h-4" />
-            <span>Reset Database</span>
+            <span>Reset Cloud Database</span>
           </button>
         </div>
-      </div>
-
-      {/* 3. IN-MEMORY SNAPSHOTS & RECOVERY VAULT */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-          <div>
-            <h3 className="text-base font-black text-slate-900 flex items-center space-x-2">
-              <FolderArchive className="w-5 h-5 text-indigo-600" />
-              <span>Local 1 TB Instant Snapshots</span>
-            </h3>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Create instant recovery points inside your browser's persistent storage without needing external file downloads.
-            </p>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <input
-              type="text"
-              value={snapshotName}
-              onChange={(e) => setSnapshotName(e.target.value)}
-              placeholder="Snapshot label (optional)..."
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-400 w-48"
-            />
-            <button
-              type="button"
-              onClick={handleCreateSnapshot}
-              disabled={isCreatingSnapshot}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{isCreatingSnapshot ? 'Saving...' : 'Save Snapshot'}</span>
-            </button>
-          </div>
-        </div>
-
-        {snapshots.length === 0 ? (
-          <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs font-medium">
-            No local snapshots created yet. Click "Save Snapshot" above to create an instant rollback point.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {snapshots.map((s, idx) => (
-              <div key={idx} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-indigo-300 transition-all space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-slate-900 truncate">
-                    {s.name || `Snapshot #${idx + 1}`}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {new Date(s.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-500 space-x-2 font-medium">
-                  <span>{s.stats?.cutoffs || 0} Cut-offs</span>
-                  <span>•</span>
-                  <span>{s.stats?.exams || 0} Exams</span>
-                  <span>•</span>
-                  <span>{s.stats?.results || 0} Results</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleRestoreSnapshot(s)}
-                  className="w-full py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-xl border border-indigo-200 transition-colors cursor-pointer flex items-center justify-center space-x-1.5"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Restore Snapshot</span>
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
 };
+

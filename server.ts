@@ -18,8 +18,21 @@ import {
   savePortalDatabaseToDB,
   getLiveNotifications,
   createLiveNotificationRecord,
-  getDatabaseStatus
+  getDatabaseStatus,
+  getRRBSyncSettings,
+  updateRRBSyncSettings,
+  getRRBSyncItems,
+  getRRBSyncItemById,
+  updateRRBSyncItemStatus,
+  updateRRBSyncItemDetails,
+  getRRBSyncLogs,
+  getRRBSyncStats
 } from './src/db/queries.ts';
+import { 
+  runRRBAutoSyncRoutine, 
+  publishSyncedItemToDatabase,
+  OFFICIAL_RRB_LIVE_FEEDS 
+} from './src/services/rrbSyncService.ts';
 
 dotenv.config();
 
@@ -121,48 +134,173 @@ app.get('/api/health', (req, res) => {
 // Official RRB Live Sync & Crawl Endpoint from https://rrb.indianrailways.gov.in/
 app.post('/api/rrb/sync', async (req, res) => {
   try {
-    const requestedBoards = req.body.boards || ['ALD', 'CDG', 'MUM', 'PAT', 'KOL', 'BPL', 'AJM', 'SEC', 'CHN', 'SBC', 'RNC', 'BSP', 'GKP', 'GHY', 'BBS', 'ADI', 'JMU', 'MFP', 'MLD', 'SGUJ', 'TVM'];
-    const startTime = Date.now();
-
-    // Check central gateway status
-    const centralGateway = {
-      url: 'https://rrb.indianrailways.gov.in/',
-      name: 'Ministry of Railways - Railway Recruitment Boards Central Gateway',
-      status: 'ONLINE',
-      statusCode: 200,
-      verifiedHttps: true,
-      lastPingMs: 42,
-    };
-
-    const syncedResults = requestedBoards.map((code: string) => {
-      return {
-        boardCode: code,
-        status: 'SYNCED',
-        gateway: 'https://rrb.indianrailways.gov.in/',
-        verifiedUrl: `https://www.rrb${code.toLowerCase()}.gov.in`,
-        lastChecked: new Date().toISOString(),
-        activeCENs: ['CEN 01/2024', 'CEN 02/2024', 'CEN 03/2024', 'CEN 05/2024', 'CEN 06/2024', 'CEN 08/2024'],
-        newUpdatesFound: 0,
-      };
-    });
-
-    const elapsed = Date.now() - startTime;
-
+    const syncResult = await runRRBAutoSyncRoutine();
     return res.json({
       success: true,
       source: 'https://rrb.indianrailways.gov.in/',
       syncedAt: new Date().toISOString(),
-      durationMs: elapsed,
-      centralGateway,
-      totalBoardsSynced: syncedResults.length,
-      syncedResults,
-      message: 'Successfully synchronized data with https://rrb.indianrailways.gov.in/ official central gateway and 21 regional RRB boards.'
+      ...syncResult,
     });
   } catch (error: any) {
     return res.status(500).json({
       success: false,
       error: error.message || 'Error syncing with RRB central server'
     });
+  }
+});
+
+// ==========================================
+// RRB AUTO SYNC & PUBLISH ENGINE API ROUTES
+// ==========================================
+
+// Get Sync Engine Status, Settings & Summary Stats
+app.get('/api/rrb-sync/status', async (req, res) => {
+  try {
+    const stats = await getRRBSyncStats();
+    return res.json({
+      success: true,
+      source: 'https://rrb.indianrailways.gov.in/',
+      ...stats,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || 'Failed to fetch sync status' });
+  }
+});
+
+// Trigger Manual Instant Sync Run
+app.post('/api/rrb-sync/run', async (req, res) => {
+  try {
+    const result = await runRRBAutoSyncRoutine();
+    return res.json({
+      success: true,
+      result,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || 'Failed to execute sync routine' });
+  }
+});
+
+// Fetch Filtered Synced Items List (for Admin review & management)
+app.get('/api/rrb-sync/items', async (req, res) => {
+  try {
+    const { status, category, search, date, limit } = req.query;
+    const items = await getRRBSyncItems({
+      status: typeof status === 'string' ? status : undefined,
+      category: typeof category === 'string' ? category : undefined,
+      search: typeof search === 'string' ? search : undefined,
+      date: typeof date === 'string' ? date : undefined,
+      limit: limit ? parseInt(limit as string) : 100,
+    });
+
+    return res.json({
+      success: true,
+      total: items.length,
+      items,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || 'Failed to fetch sync items' });
+  }
+});
+
+// Publish a single item directly to Live Central Database
+app.post('/api/rrb-sync/publish/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Valid item ID is required' });
+    }
+
+    const publishResult = await publishSyncedItemToDatabase(id, 'Admin (Manual Publish)');
+    return res.json({
+      success: true,
+      ...publishResult,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || 'Failed to publish item' });
+  }
+});
+
+// Reject an item from review queue
+app.post('/api/rrb-sync/reject/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Valid item ID is required' });
+    }
+
+    const updated = await updateRRBSyncItemStatus(id, 'rejected');
+    return res.json({
+      success: true,
+      message: 'Item rejected and marked inactive.',
+      item: updated,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || 'Failed to reject item' });
+  }
+});
+
+// Edit item details before publishing
+app.post('/api/rrb-sync/edit/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Valid item ID is required' });
+    }
+
+    const { title, cenNumber, examName, category, zoneCode, publishDate, description, officialPdfUrl, status } = req.body;
+    const updated = await updateRRBSyncItemDetails(id, {
+      title,
+      cenNumber,
+      examName,
+      category,
+      zoneCode,
+      publishDate,
+      description,
+      officialPdfUrl,
+      status,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Item details updated successfully.',
+      item: updated,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || 'Failed to update item details' });
+  }
+});
+
+// Fetch Audit / Crawler Logs
+app.get('/api/rrb-sync/logs', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 60;
+    const logs = await getRRBSyncLogs(limit);
+    return res.json({
+      success: true,
+      logs,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || 'Failed to fetch sync logs' });
+  }
+});
+
+// Update Auto-Sync Settings
+app.post('/api/rrb-sync/settings', async (req, res) => {
+  try {
+    const { autoSyncEnabled, autoPublishEnabled, intervalMinutes } = req.body;
+    const updated = await updateRRBSyncSettings({
+      autoSyncEnabled: typeof autoSyncEnabled === 'boolean' ? autoSyncEnabled : undefined,
+      autoPublishEnabled: typeof autoPublishEnabled === 'boolean' ? autoPublishEnabled : undefined,
+      intervalMinutes: typeof intervalMinutes === 'number' ? intervalMinutes : undefined,
+    });
+
+    return res.json({
+      success: true,
+      message: 'RRB Auto-Sync settings updated successfully.',
+      settings: updated,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || 'Failed to update settings' });
   }
 });
 
@@ -475,6 +613,42 @@ app.get('/api/db/stats', async (req, res) => {
   }
 });
 
+// Background Auto-Sync Scheduler
+function initRRBAutoSyncScheduler() {
+  console.log('🔄 Initializing RRB Official Gateway Auto-Sync Scheduler...');
+  
+  // Run initial sync after 3 seconds on server boot
+  setTimeout(async () => {
+    try {
+      const settings = await getRRBSyncSettings();
+      if (settings.autoSyncEnabled) {
+        console.log('🚀 Running initial boot sync with https://rrb.indianrailways.gov.in/...');
+        await runRRBAutoSyncRoutine();
+      }
+    } catch (err) {
+      console.warn('Initial RRB auto-sync boot notice:', err);
+    }
+  }, 3000);
+
+  // Periodic check every 10 minutes
+  setInterval(async () => {
+    try {
+      const settings = await getRRBSyncSettings();
+      if (!settings.autoSyncEnabled) return;
+
+      const now = Date.now();
+      const nextSyncTime = settings.nextSyncAt ? new Date(settings.nextSyncAt).getTime() : 0;
+
+      if (now >= nextSyncTime) {
+        console.log('⏰ Scheduled auto-sync triggered for https://rrb.indianrailways.gov.in/');
+        await runRRBAutoSyncRoutine();
+      }
+    } catch (err) {
+      console.warn('Periodic auto-sync cycle error:', err);
+    }
+  }, 10 * 60 * 1000);
+}
+
 async function startServer() {
   // Vite middleware in development
   if (process.env.NODE_ENV !== 'production') {
@@ -493,6 +667,7 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`RRB Smart Portal Server running on http://0.0.0.0:${PORT}`);
+    initRRBAutoSyncScheduler();
   });
 }
 

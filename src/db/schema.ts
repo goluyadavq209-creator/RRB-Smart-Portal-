@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
 
 // Users table authenticated via Firebase Auth
 export const users = pgTable('users', {
@@ -99,3 +99,47 @@ export const candidateFeedbackRelations = relations(candidateFeedback, ({ one })
     references: [users.id],
   }),
 }));
+
+// Discovered & Synced Official RRB Items
+export const rrbSyncItems = pgTable('rrb_sync_items', {
+  id: serial('id').primaryKey(),
+  title: text('title').notNull(),
+  cenNumber: text('cen_number'),
+  examName: text('exam_name'),
+  category: text('category').notNull().default('notice'), // 'notice' | 'cen' | 'result' | 'answer_key' | 'exam_schedule' | 'cutoff' | 'other'
+  zoneCode: text('zone_code').default('ALL'),
+  publishDate: text('publish_date'), // ISO date YYYY-MM-DD
+  description: text('description'),
+  officialSourceUrl: text('official_source_url'),
+  officialPdfUrl: text('official_pdf_url'),
+  officialLinks: text('official_links'), // JSON array string
+  status: text('status').notNull().default('pending_review'), // 'pending_review' | 'published' | 'rejected'
+  confidence: text('confidence').default('high'), // 'high' | 'low'
+  source: text('source').default('RRB_OFFICIAL'),
+  importedAt: timestamp('imported_at').defaultNow(),
+  publishedAt: timestamp('published_at'),
+  rawMetadata: text('raw_metadata'),
+});
+
+// Real-time RRB Synchronization Logs & Audits
+export const rrbSyncLogs = pgTable('rrb_sync_logs', {
+  id: serial('id').primaryKey(),
+  action: text('action').notNull(), // 'sync_started' | 'sync_completed' | 'item_discovered' | 'item_imported' | 'item_updated' | 'duplicate_skipped' | 'item_published' | 'item_rejected' | 'error'
+  details: text('details').notNull(),
+  sourceUrl: text('source_url'),
+  recordId: text('record_id'),
+  status: text('status').default('success'), // 'success' | 'warning' | 'error'
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Background Auto-Sync Settings
+export const rrbSyncSettings = pgTable('rrb_sync_settings', {
+  id: serial('id').primaryKey(),
+  key: text('key').notNull().unique().default('default_settings'),
+  autoSyncEnabled: boolean('auto_sync_enabled').default(true),
+  autoPublishEnabled: boolean('auto_publish_enabled').default(true),
+  intervalMinutes: integer('interval_minutes').default(30),
+  lastSyncAt: timestamp('last_sync_at'),
+  nextSyncAt: timestamp('next_sync_at'),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
