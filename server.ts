@@ -3,6 +3,18 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
+import { requireAuth, AuthRequest } from './src/middleware/auth.ts';
+import { 
+  getOrCreateUser, 
+  getUserByUid, 
+  recordFormExport, 
+  getFormExports, 
+  recordSheetExport, 
+  getSheetExports, 
+  recordCandidateFeedback, 
+  getAllFeedback, 
+  getDbStats 
+} from './src/db/queries.ts';
 
 dotenv.config();
 
@@ -211,6 +223,157 @@ app.post('/api/gemini/chat', async (req, res) => {
       reply: null,
       fallbackNeeded: true,
       error: error.message || 'Gemini API limit or error',
+    });
+  }
+});
+
+// ==========================================
+// CLOUD SQL DATABASE ENDPOINTS
+// ==========================================
+
+// Synchronize authenticated user to Cloud SQL
+app.post('/api/db/sync-user', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const uid = req.user?.uid;
+    const email = req.user?.email || req.body.email;
+    const displayName = req.body.displayName || req.user?.name;
+    const photoURL = req.body.photoURL || req.user?.picture;
+
+    if (!uid || !email) {
+      return res.status(400).json({ error: 'UID and Email are required' });
+    }
+
+    const userRecord = await getOrCreateUser(uid, email, displayName, photoURL);
+    return res.json({ success: true, user: userRecord });
+  } catch (error: any) {
+    console.error('Error syncing user with Cloud SQL:', error);
+    return res.status(500).json({ error: error.message || 'Failed to sync user' });
+  }
+});
+
+// Record Google Form export in Cloud SQL
+app.post('/api/db/export-form', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' });
+
+    const user = await getUserByUid(uid);
+    if (!user) {
+      return res.status(404).json({ error: 'User record not found in database' });
+    }
+
+    const { formId, formTitle, formUrl, formType } = req.body;
+    if (!formId || !formTitle || !formUrl) {
+      return res.status(400).json({ error: 'Missing formId, formTitle, or formUrl' });
+    }
+
+    const record = await recordFormExport(user.id, formId, formTitle, formUrl, formType);
+    return res.json({ success: true, record });
+  } catch (error: any) {
+    console.error('Error saving form export to Cloud SQL:', error);
+    return res.status(500).json({ error: error.message || 'Failed to save form export' });
+  }
+});
+
+// Record Google Sheet export in Cloud SQL
+app.post('/api/db/export-sheet', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' });
+
+    const user = await getUserByUid(uid);
+    if (!user) {
+      return res.status(404).json({ error: 'User record not found in database' });
+    }
+
+    const { sheetId, sheetTitle, sheetUrl, rowCount, exportType } = req.body;
+    if (!sheetId || !sheetTitle || !sheetUrl) {
+      return res.status(400).json({ error: 'Missing sheetId, sheetTitle, or sheetUrl' });
+    }
+
+    const record = await recordSheetExport(user.id, sheetId, sheetTitle, sheetUrl, rowCount || 0, exportType);
+    return res.json({ success: true, record });
+  } catch (error: any) {
+    console.error('Error saving sheet export to Cloud SQL:', error);
+    return res.status(500).json({ error: error.message || 'Failed to save sheet export' });
+  }
+});
+
+// Fetch user's saved exports from Cloud SQL
+app.get('/api/db/user-exports', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' });
+
+    const user = await getUserByUid(uid);
+    if (!user) {
+      return res.json({ forms: [], sheets: [] });
+    }
+
+    const [forms, sheets] = await Promise.all([
+      getFormExports(user.id),
+      getSheetExports(user.id),
+    ]);
+
+    return res.json({ forms, sheets });
+  } catch (error: any) {
+    console.error('Error fetching exports from Cloud SQL:', error);
+    return res.status(500).json({ error: error.message || 'Failed to fetch user exports' });
+  }
+});
+
+// Submit Candidate Feedback / Query into Cloud SQL
+app.post('/api/db/feedback', async (req, res) => {
+  try {
+    const { candidateName, rollNumber, examName, zone, feedbackText, rating } = req.body;
+    if (!candidateName || !examName || !zone || !feedbackText) {
+      return res.status(400).json({ error: 'Missing required feedback fields' });
+    }
+
+    const record = await recordCandidateFeedback({
+      candidateName,
+      rollNumber,
+      examName,
+      zone,
+      feedbackText,
+      rating: Number(rating) || 5,
+    });
+
+    return res.json({ success: true, record });
+  } catch (error: any) {
+    console.error('Error logging feedback to Cloud SQL:', error);
+    return res.status(500).json({ error: error.message || 'Failed to record feedback' });
+  }
+});
+
+// Fetch Feedback list from Cloud SQL
+app.get('/api/db/feedback', async (req, res) => {
+  try {
+    const list = await getAllFeedback();
+    return res.json({ success: true, feedback: list });
+  } catch (error: any) {
+    console.error('Error fetching feedback from Cloud SQL:', error);
+    return res.status(500).json({ error: error.message || 'Failed to fetch feedback' });
+  }
+});
+
+// Cloud SQL Database health and statistics
+app.get('/api/db/stats', async (req, res) => {
+  try {
+    const stats = await getDbStats();
+    return res.json({
+      success: true,
+      cloudSql: {
+        engine: 'PostgreSQL 16 (Cloud SQL Developer Edition)',
+        region: 'asia-southeast1',
+        projectId: 'rare-cargo-jlcf1',
+        ...stats,
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch DB stats',
     });
   }
 });

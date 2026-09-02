@@ -166,6 +166,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               Notifications
             </button>
 
+            {/* Google Forms & Sheets Workspace Hub */}
+            <button
+              onClick={() => {
+                setCurrentTab('workspace');
+                setActiveDropdown(null);
+              }}
+              className={`px-3.5 py-2 rounded-full transition-all cursor-pointer flex items-center space-x-1.5 font-bold ${
+                currentTab === 'workspace'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>Forms & Sheets</span>
+            </button>
+
             {/* More */}
             <div className="relative">
               <button
@@ -276,6 +292,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               { id: 'home' as TabView, label: 'Home', icon: Home },
               { id: 'answer-check' as TabView, label: 'Answer Check 🧮', badge: 'New Calculator' },
               { id: 'roll-check' as TabView, label: 'Roll Check 🔍', badge: 'Direct' },
+              { id: 'workspace' as TabView, label: 'Google Forms & Sheets', badge: 'Drive Sync' },
               { id: 'cutoffs' as TabView, label: 'Cut-Off Finder', badge: database.cutoffs.length },
               { id: 'notices' as TabView, label: 'Answer Keys & Notices', badge: database.notices.length },
               { id: 'results' as TabView, label: 'Results & Panels', badge: database.results.length },

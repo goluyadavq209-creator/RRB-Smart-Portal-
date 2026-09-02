@@ -253,4 +253,4 @@ export interface FullAnswerEvaluationReport {
   subjectBreakdown: SubjectBreakdown[];
 }
 
-export type TabView = 'home' | 'roll-check' | 'answer-check' | 'exams' | 'cutoffs' | 'notices' | 'results' | 'admin';
+export type TabView = 'home' | 'roll-check' | 'answer-check' | 'exams' | 'cutoffs' | 'notices' | 'results' | 'workspace' | 'admin';

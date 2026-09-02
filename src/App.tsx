@@ -33,6 +33,7 @@ import { NotificationToastContainer } from './components/NotificationToastContai
 import { NotificationCenterModal } from './components/NotificationCenterModal';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { RailwayLogo } from './components/RailwayLogo';
+import { GoogleWorkspaceHub } from './components/GoogleWorkspaceHub';
 
 export default function App() {
   const [database, setDatabase] = useState<FullRRBDatabase>(loadRRBDatabase);
@@ -262,6 +263,10 @@ export default function App() {
             setSelectedZoneFilter={setSelectedZoneFilter}
             setCurrentTab={handleNavigate}
           />
+        )}
+
+        {currentTab === 'workspace' && (
+          <GoogleWorkspaceHub onClose={() => handleNavigate('home')} />
         )}
 
         {currentTab === 'admin' && (
