@@ -1,16 +1,88 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  addDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  serverTimestamp,
+  where,
+  limit,
+  writeBatch,
+  getDocFromServer
+} from 'firebase/firestore';
 import { 
   getAuth, 
   signInWithPopup, 
   GoogleAuthProvider, 
   onAuthStateChanged, 
   User, 
-  signOut 
+  signOut,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+// Initialize Firebase App instance
+export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+
+// Initialize Cloud Firestore database instance (Single Source of Truth)
+export const db = getFirestore(app);
+
+// Initialize Firebase Authentication instance
 export const auth = getAuth(app);
+
+// Re-export Firestore primitives for uniform access across the app
+export {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  addDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  serverTimestamp,
+  where,
+  limit,
+  writeBatch,
+  getDocFromServer,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged,
+  GoogleAuthProvider,
+  updateProfile,
+  sendPasswordResetEmail
+};
+
+export type { User };
+
+// Test connection to Firestore
+export async function testFirestoreConnection(): Promise<boolean> {
+  try {
+    await getDocFromServer(doc(db, 'portalSettings', 'connection_test'));
+    return true;
+  } catch (error: any) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn('Firebase connection: Client is offline or Firestore is initializing.');
+    }
+    return false;
+  }
+}
 
 export const googleAuthProvider = new GoogleAuthProvider();
 

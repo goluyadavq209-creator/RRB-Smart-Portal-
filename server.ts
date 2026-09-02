@@ -435,6 +435,34 @@ app.post('/api/database', async (req, res) => {
   }
 });
 
+// Seed or Reset to Official Live RRB Records in Cloud SQL
+app.post('/api/database/seed-official', async (req, res) => {
+  try {
+    const { DEFAULT_OFFICIAL_PORTAL_DATABASE } = await import('./src/data/defaultData.ts');
+    const saveResult = await savePortalDatabaseToDB(
+      DEFAULT_OFFICIAL_PORTAL_DATABASE,
+      'System (Official Seed)',
+      {
+        title: '🚂 Official Railway Records Initialized',
+        message: 'All CEN exams, cut-offs, circulars, and candidate links are live in Cloud SQL database.',
+        category: 'notice',
+        targetTab: 'home',
+      }
+    );
+
+    return res.json({
+      success: true,
+      message: 'Official RRB records successfully seeded in Cloud SQL database.',
+      version: saveResult.record.version,
+      updatedAt: saveResult.record.updatedAt,
+      data: DEFAULT_OFFICIAL_PORTAL_DATABASE,
+    });
+  } catch (error: any) {
+    console.error('Error seeding official database to Cloud SQL:', error);
+    return res.status(500).json({ error: error.message || 'Failed to seed database' });
+  }
+});
+
 // Fast Status / Version Check for Live Polling across all connected users
 app.get('/api/database/status', async (req, res) => {
   try {

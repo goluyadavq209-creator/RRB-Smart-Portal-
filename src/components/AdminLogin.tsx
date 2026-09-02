@@ -13,7 +13,7 @@ import {
   Clock,
   ShieldAlert
 } from 'lucide-react';
-import { loginAdmin, getSecurityStatus } from '../utils/auth';
+import { loginAdmin, loginAdminAsync, getSecurityStatus } from '../utils/auth';
 
 interface AdminLoginProps {
   onSuccess: () => void;
@@ -57,7 +57,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, onCancel }) =
   }, [securityStatus.isLocked, lockoutTimer]);
 
   // Submit Handler
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -83,13 +83,13 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, onCancel }) =
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      const success = loginAdmin(cleanUser, cleanPass, rememberMe);
+    try {
+      const res = await loginAdminAsync(cleanUser, cleanPass, rememberMe);
       setIsLoading(false);
       const updatedSec = getSecurityStatus();
       setSecurityStatus(updatedSec);
 
-      if (success) {
+      if (res.success) {
         setSuccessMsg('Authentication Successful! Redirecting to Admin Dashboard...');
         setTimeout(() => onSuccess(), 250);
       } else {
@@ -97,10 +97,13 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, onCancel }) =
           setLockoutTimer(updatedSec.remainingLockTimeSeconds);
           setErrorMsg(`Too many invalid attempts! Security lock active for ${updatedSec.remainingLockTimeSeconds} seconds.`);
         } else {
-          setErrorMsg(`Invalid Username / Email or Password. (${updatedSec.attemptsLeft} attempts left before temporary lock)`);
+          setErrorMsg(res.error || `Invalid credentials. (${updatedSec.attemptsLeft} attempts left)`);
         }
       }
-    }, 250);
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMsg(err.message || 'Authentication failed.');
+    }
   };
 
   return (

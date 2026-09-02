@@ -152,7 +152,9 @@ export type PortalLinkType =
   | 'admit_card' 
   | 'city_intimation' 
   | 'answer_key' 
-  | 'score_card';
+  | 'score_card'
+  | 'official_portal'
+  | 'other';
 
 export interface CandidatePortalLink {
   id: string;
@@ -165,6 +167,51 @@ export interface CandidatePortalLink {
   publishDate?: string;
   isActive: boolean;
   notes?: string;
+}
+
+export interface MockTestItem {
+  id: string;
+  title: string;
+  cenNumber?: string;
+  subject?: string;
+  durationMinutes: number;
+  totalQuestions: number;
+  description?: string;
+  testUrl?: string;
+  createdAt?: string;
+}
+
+export interface AnswerKeyItem {
+  id: string;
+  cenNumber: string;
+  examTitle: string;
+  stage: string;
+  shift?: string;
+  examDate?: string;
+  keyUrl: string;
+  objectionStart?: string;
+  objectionEnd?: string;
+  createdAt?: string;
+}
+
+export interface StudyMaterialItem {
+  id: string;
+  title: string;
+  category: string;
+  cenNumber?: string;
+  fileUrl: string;
+  description?: string;
+  fileSize?: string;
+  createdAt?: string;
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName?: string;
+  photoURL?: string;
+  role: 'student' | 'admin' | 'moderator';
+  createdAt?: string;
 }
 
 export interface SiteSettings {
@@ -192,6 +239,9 @@ export interface FullRRBDatabase {
   results: ResultItem[];
   portalLinks?: CandidatePortalLink[];
   candidateScorecards?: CandidateScoreRecord[];
+  mockTests?: MockTestItem[];
+  answerKeys?: AnswerKeyItem[];
+  studyMaterials?: StudyMaterialItem[];
 }
 
 export type QuestionOption = 'Option 1' | 'Option 2' | 'Option 3' | 'Option 4';

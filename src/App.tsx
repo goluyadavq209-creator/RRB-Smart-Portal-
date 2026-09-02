@@ -14,7 +14,9 @@ import {
   Bot
 } from 'lucide-react';
 import { FullRRBDatabase, TabView } from './types';
-import { loadRRBDatabase, saveRRBDatabase, syncWithServerDatabase, exportEmptySchemaJson } from './utils/storage';
+import { loadRRBDatabase, saveRRBDatabase, exportEmptySchemaJson } from './utils/storage';
+import { dbService } from './services/dbService';
+import { firestoreService, FirestoreServiceStatus } from './services/firestoreService';
 import { checkAdminSession, logoutAdmin } from './utils/auth';
 import { TopGovBar } from './components/TopGovBar';
 import { Navbar } from './components/Navbar';
@@ -46,67 +48,44 @@ export default function App() {
   const [language, setLanguage] = useState<'hi' | 'en'>('hi');
   const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('base');
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [firestoreStatus, setFirestoreStatus] = useState<FirestoreServiceStatus>(() => firestoreService.getStatus());
+  const [dismissErrorBanner, setDismissErrorBanner] = useState(false);
 
-  // Initial sync from central Cloud SQL PostgreSQL database on load
+  // Real-time synchronization from Cloud Firestore
   useEffect(() => {
-    syncWithServerDatabase().then((serverDb) => {
-      if (serverDb) {
-        setDatabase(serverDb);
+    // 1. Subscribe to real-time Firestore collection updates via onSnapshot
+    const unsubscribeDb = firestoreService.subscribe((newDb) => {
+      setDatabase(newDb);
+    });
+
+    // 2. Track Firestore connection & permission status
+    const unsubscribeStatus = firestoreService.subscribeStatus((status) => {
+      setFirestoreStatus(status);
+      if (!status.error) {
+        setDismissErrorBanner(false);
       }
     });
-  }, []);
 
-  // Real-time live polling from Cloud SQL to broadcast updates to all active users
-  useEffect(() => {
-    let lastKnownTimestamp = '';
-    let lastNotifId = 0;
-
-    const pollInterval = setInterval(async () => {
-      try {
-        const res = await fetch('/api/database/status');
-        if (!res.ok) return;
-        const status = await res.json();
-
-        // If Cloud SQL server timestamp has changed, update client database seamlessly
-        if (status.updatedAt && status.updatedAt !== lastKnownTimestamp) {
-          lastKnownTimestamp = status.updatedAt;
-          const freshDb = await syncWithServerDatabase();
-          if (freshDb) {
-            setDatabase(freshDb);
-          }
-        }
-
-        // If a new live notification was logged, show immediate 3-second popup alert
-        if (status.latestNotification && status.latestNotification.id && status.latestNotification.id !== lastNotifId) {
-          lastNotifId = status.latestNotification.id;
-          
-          window.dispatchEvent(new CustomEvent('rrb_notifications_updated', {
-            detail: {
-              notification: {
-                id: `server-notif-${status.latestNotification.id}`,
-                title: status.latestNotification.title,
-                message: status.latestNotification.message,
-                category: status.latestNotification.category || 'notice',
-                targetTab: status.latestNotification.targetTab || 'notices',
-                timestamp: status.latestNotification.createdAt,
-                read: false,
-                badgeText: 'Live Update',
-              }
-            }
-          }));
-        }
-      } catch (err) {
-        // Silent catch for polling
+    // 3. Listen to local broadcast events
+    const handleCustomDbEvent = (e: any) => {
+      if (e.detail?.database) {
+        setDatabase(e.detail.database);
       }
-    }, 4000); // 4 seconds polling for instantaneous user updates
+    };
+    window.addEventListener('rrb_database_updated', handleCustomDbEvent);
 
-    return () => clearInterval(pollInterval);
+    return () => {
+      unsubscribeDb();
+      unsubscribeStatus();
+      window.removeEventListener('rrb_database_updated', handleCustomDbEvent);
+    };
   }, []);
 
   // Central Database mutation handler for Admin actions
   const handleDatabaseUpdate = (newDb: FullRRBDatabase) => {
     setDatabase(newDb);
     saveRRBDatabase(newDb);
+    firestoreService.saveFullDatabaseToFirestore(newDb).catch((e) => console.warn('Firestore database sync:', e));
   };
 
   // Support direct URL hash (#admin) or query parameter (?admin) for administrator access
@@ -276,17 +255,57 @@ export default function App() {
         onAdminLogout={handleAdminLogout}
       />
 
+      {/* Cloud Firestore Status & Friendly Error Alert */}
+      {firestoreStatus.error && !dismissErrorBanner && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3">
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-900 shadow-xs">
+            <div className="flex items-center space-x-2">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+              <span className="font-semibold">Cloud Firestore Connection Notice:</span>
+              <span className="text-amber-800">{firestoreStatus.error}</span>
+            </div>
+            <div className="flex items-center space-x-2 shrink-0">
+              <button
+                onClick={() => firestoreService.refreshAllListeners()}
+                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-[11px] cursor-pointer"
+              >
+                Retry Sync
+              </button>
+              <button
+                onClick={() => setDismissErrorBanner(true)}
+                className="text-amber-600 hover:text-amber-800 p-1 text-sm font-bold cursor-pointer"
+                title="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 3. Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12">
-        {currentTab === 'home' && (
-          <HomeDashboard
-            database={database}
-            setCurrentTab={handleNavigate}
-            selectedZoneFilter={selectedZoneFilter}
-            setSelectedZoneFilter={setSelectedZoneFilter}
-            onOpenGlobalSearch={() => setIsSearchOpen(true)}
-          />
-        )}
+        {firestoreStatus.isLoading && !database.exams.length ? (
+          <div className="py-20 flex flex-col items-center justify-center space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full border-4 border-slate-200 border-t-red-600 animate-spin"></div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-slate-800">Connecting to Cloud Firestore...</h3>
+              <p className="text-xs text-slate-500 max-w-sm">
+                Fetching official Railway Recruitment Board examination schedules, cutoffs, and circulars.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {currentTab === 'home' && (
+              <HomeDashboard
+                database={database}
+                setCurrentTab={handleNavigate}
+                selectedZoneFilter={selectedZoneFilter}
+                setSelectedZoneFilter={setSelectedZoneFilter}
+                onOpenGlobalSearch={() => setIsSearchOpen(true)}
+              />
+            )}
 
         {currentTab === 'exams' && (
           <ExamsSection
@@ -340,6 +359,8 @@ export default function App() {
               onLogout={handleAdminLogout}
             />
           )
+        )}
+          </>
         )}
       </main>
 

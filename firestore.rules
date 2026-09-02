@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        (request.auth.token.email != null && request.auth.token.email in [
+          'maansinghyadav095@gmail.com',
+          'ymaan841@gmail.com',
+          'admin@rrb-smart-portal.gov.in'
+        ]) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email != null && exists(/databases/$(database)/documents/admins/$(request.auth.token.email)))
+      );
+    }
+
+    // Admins authorization registry
+    match /admins/{adminId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Public Portal Collections: Public read, Admin write
+    match /notices/{noticeId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /exams/{examId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /cutoffs/{cutoffId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /results/{resultId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /mockTests/{testId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /answerKeys/{keyId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /studyMaterials/{materialId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Candidate links and portal config
+    match /portalLinks/{linkId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /portalSettings/{settingId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}

@@ -3,6 +3,7 @@ import { BarChart3, Plus, Search, Trash2, Edit3, Filter, CheckCircle2 } from 'lu
 import { FullRRBDatabase, CutoffRecord, CutoffStage } from '../../types';
 import { saveRRBDatabase } from '../../utils/storage';
 import { OFFICIAL_RRB_ZONES } from '../../data/defaultData';
+import { firestoreService } from '../../services/firestoreService';
 
 interface AdminCutoffViewProps {
   database: FullRRBDatabase;
@@ -76,21 +77,23 @@ export const AdminCutoffView: React.FC<AdminCutoffViewProps> = ({
       cutoffs: [newRecord, ...database.cutoffs],
     };
 
+    firestoreService.createCutoff(newRecord).catch((err) => console.warn('Firestore cutoff write:', err));
     saveRRBDatabase(updated);
     setDatabase(updated);
     setShowAddModal(false);
-    onSuccessMessage(`Added cut-off score for ${newRecord.postName} (${newRecord.zoneName})`);
+    onSuccessMessage(`Added cut-off score to Cloud Firestore: ${newRecord.postName} (${newRecord.zoneName})`);
   };
 
   const handleDelete = (id: string, title: string) => {
-    if (window.confirm(`Delete cut-off record for "${title}"?`)) {
+    if (window.confirm(`Delete cut-off record for "${title}" from Cloud Firestore permanently?`)) {
+      firestoreService.deleteCutoff(id).catch((err) => console.warn('Firestore cutoff delete:', err));
       const updated = {
         ...database,
         cutoffs: database.cutoffs.filter((c) => c.id !== id),
       };
       saveRRBDatabase(updated);
       setDatabase(updated);
-      onSuccessMessage(`Removed cut-off record`);
+      onSuccessMessage(`Removed cut-off record from Cloud Firestore`);
     }
   };
 

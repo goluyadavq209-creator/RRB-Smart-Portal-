@@ -674,6 +674,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           {activeTab === 'content' && (
             <AdminContentView
               database={database}
+              setDatabase={setDatabase}
               onSuccessMessage={showToast}
             />
           )}
@@ -681,6 +682,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           {activeTab === 'links' && (
             <AdminContentView
               database={database}
+              setDatabase={setDatabase}
               onSuccessMessage={showToast}
             />
           )}

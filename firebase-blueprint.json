@@ -1,0 +1,183 @@
+{
+  "entities": {
+    "Notice": {
+      "title": "Notice",
+      "description": "Official Railway notices and alerts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "cenNumber": { "type": "string" },
+        "publishDate": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "pdfUrl": { "type": "string" },
+        "isNew": { "type": "boolean" },
+        "isImportant": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["title", "publishDate"]
+    },
+    "Exam": {
+      "title": "Exam",
+      "description": "Railway recruitment CEN examinations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "cenNumber": { "type": "string" },
+        "title": { "type": "string" },
+        "shortCode": { "type": "string" },
+        "department": { "type": "string" },
+        "status": { "type": "string" },
+        "totalVacancies": { "type": "number" },
+        "applicationStart": { "type": "string" },
+        "applicationEnd": { "type": "string" },
+        "examStages": { "type": "string" },
+        "officialPdfUrl": { "type": "string" }
+      },
+      "required": ["title", "cenNumber"]
+    },
+    "Cutoff": {
+      "title": "Cutoff",
+      "description": "Official category cut-off marks for RRB exams",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "cenNumber": { "type": "string" },
+        "zoneCode": { "type": "string" },
+        "zoneName": { "type": "string" },
+        "postName": { "type": "string" },
+        "stage": { "type": "string" },
+        "year": { "type": "number" },
+        "ur": { "type": "number" },
+        "obc": { "type": "number" },
+        "sc": { "type": "number" },
+        "st": { "type": "number" },
+        "ews": { "type": "number" }
+      },
+      "required": ["cenNumber", "zoneCode", "postName"]
+    },
+    "Result": {
+      "title": "Result",
+      "description": "Declared merit lists and examination results",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "cenNumber": { "type": "string" },
+        "examTitle": { "type": "string" },
+        "zoneCode": { "type": "string" },
+        "zoneName": { "type": "string" },
+        "stage": { "type": "string" },
+        "publishDate": { "type": "string" },
+        "type": { "type": "string" },
+        "fileUrl": { "type": "string" }
+      },
+      "required": ["cenNumber", "examTitle", "publishDate"]
+    },
+    "MockTest": {
+      "title": "MockTest",
+      "description": "Mock tests and practice question sets",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "cenNumber": { "type": "string" },
+        "subject": { "type": "string" },
+        "durationMinutes": { "type": "number" },
+        "totalQuestions": { "type": "number" }
+      },
+      "required": ["title"]
+    },
+    "AnswerKey": {
+      "title": "AnswerKey",
+      "description": "Provisional and final answer keys with objection links",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "cenNumber": { "type": "string" },
+        "examTitle": { "type": "string" },
+        "stage": { "type": "string" },
+        "shift": { "type": "string" },
+        "examDate": { "type": "string" },
+        "keyUrl": { "type": "string" }
+      },
+      "required": ["cenNumber", "examTitle"]
+    },
+    "StudyMaterial": {
+      "title": "StudyMaterial",
+      "description": "Preparation guides and syllabus PDFs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "cenNumber": { "type": "string" }
+      },
+      "required": ["title"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Authenticated student/candidate user record",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Authorized administrators list for role verification",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "grantedAt": { "type": "string" }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/notices/{noticeId}": {
+      "schema": "Notice",
+      "description": "Public railway recruitment notices sorted by date"
+    },
+    "/exams/{examId}": {
+      "schema": "Exam",
+      "description": "Centralized active railway recruitment exams"
+    },
+    "/cutoffs/{cutoffId}": {
+      "schema": "Cutoff",
+      "description": "Official category cut-off marks across all 21 RRBs"
+    },
+    "/results/{resultId}": {
+      "schema": "Result",
+      "description": "Candidate merit lists and result circulars"
+    },
+    "/mockTests/{testId}": {
+      "schema": "MockTest",
+      "description": "CBT practice tests and sample papers"
+    },
+    "/answerKeys/{keyId}": {
+      "schema": "AnswerKey",
+      "description": "Provisional answer keys and response sheets"
+    },
+    "/studyMaterials/{materialId}": {
+      "schema": "StudyMaterial",
+      "description": "Preparation guides and syllabus PDFs"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Registered candidate profile records"
+    },
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Secure list of authorized administrator emails/UIDs"
+    }
+  }
+}

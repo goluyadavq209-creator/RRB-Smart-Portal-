@@ -415,3 +415,69 @@ export function logoutAdmin(): void {
   sessionStorage.removeItem(OTP_STORAGE_KEY);
 }
 
+/**
+ * Modern Firebase Authentication + Admin Authorization Layer
+ */
+export async function loginAdminAsync(
+  usernameOrEmail: string,
+  password: string,
+  rememberMe: boolean = false
+): Promise<{ success: boolean; error?: string }> {
+  const cleanInput = sanitizeInput(usernameOrEmail);
+  const cleanPass = password.trim();
+
+  // Try Firebase Auth if email formatted
+  if (cleanInput.includes('@')) {
+    try {
+      const { auth, signInWithEmailAndPassword } = await import('../lib/firebase');
+      const { firestoreService } = await import('../services/firestoreService');
+      const userCred = await signInWithEmailAndPassword(auth, cleanInput, cleanPass);
+      const isAdmin = await firestoreService.isUserAdmin(userCred.user);
+      
+      if (!isAdmin) {
+        return {
+          success: false,
+          error: 'Access Denied: This account is authenticated but does not possess Railway Administrator privileges.',
+        };
+      }
+
+      resetFailedAttempts();
+      const sessionData = JSON.stringify({
+        isAuthenticated: true,
+        adminId: userCred.user.email || cleanInput,
+        token: `fb_${userCred.user.uid}`,
+        loginTime: new Date().toISOString(),
+        expiry: Date.now() + (rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000),
+      });
+
+      if (rememberMe) {
+        localStorage.setItem(AUTH_SESSION_KEY, sessionData);
+      } else {
+        sessionStorage.setItem(AUTH_SESSION_KEY, sessionData);
+      }
+      return { success: true };
+    } catch (fbErr: any) {
+      console.warn('Firebase email auth attempt info:', fbErr?.code || fbErr?.message);
+    }
+  }
+
+  // Fallback to existing hashed admin credentials
+  const syncSuccess = loginAdmin(cleanInput, cleanPass, rememberMe);
+  if (syncSuccess) {
+    return { success: true };
+  }
+
+  const updatedSec = getSecurityStatus();
+  if (updatedSec.isLocked) {
+    return {
+      success: false,
+      error: `Too many invalid attempts. Security lock active for ${updatedSec.remainingLockTimeSeconds} seconds.`,
+    };
+  }
+
+  return {
+    success: false,
+    error: `Invalid credentials. (${updatedSec.attemptsLeft} attempts remaining before temporary lock)`,
+  };
+}
+

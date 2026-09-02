@@ -1,11 +1,9 @@
 {
-  "projectId": "rare-cargo-jlcf1",
-  "appId": "1:89904593481:web:8b170b19dcfd9603241d98",
-  "apiKey": "AIzaSyBQgPCVqVMobhl-o7eSXMAoznSaAVDea-Y",
-  "authDomain": "rare-cargo-jlcf1.firebaseapp.com",
-  "storageBucket": "rare-cargo-jlcf1.firebasestorage.app",
-  "messagingSenderId": "89904593481",
-  "measurementId": "",
-  "oAuthClientId": "89904593481-sj2edfj3t86kts7vi0cd61vd6esgh8ie.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "apiKey": "AIzaSyAorRk8xPWQD43t4IX8ehx3ypC_KtwElEQ",
+  "authDomain": "rrb-smart-portal.firebaseapp.com",
+  "projectId": "rrb-smart-portal",
+  "storageBucket": "rrb-smart-portal.firebasestorage.app",
+  "messagingSenderId": "700839774462",
+  "appId": "1:700839774462:web:91299185ff0b4ba7cabdaf",
+  "measurementId": "G-HX6YQLR0F4"
 }

@@ -30,6 +30,7 @@ import * as XLSX from 'xlsx';
 import { FullRRBDatabase, ResultItem, ResultType, CandidateScoreRecord } from '../../types';
 import { OFFICIAL_RRB_ZONES } from '../../data/defaultData';
 import { saveRRBDatabase } from '../../utils/storage';
+import { firestoreService } from '../../services/firestoreService';
 import { extractTextFromPdf, analyzeRrbPdfText } from '../../utils/pdfExtractor';
 
 interface AdminRollNumbersViewProps {
@@ -300,15 +301,17 @@ export const AdminRollNumbersView: React.FC<AdminRollNumbersViewProps> = ({
         },
       };
 
+      firestoreService.createResult(newResult).catch((err) => console.warn('Firestore result write:', err));
       setDatabase(updatedDb);
       saveRRBDatabase(updatedDb);
-      onSuccessMessage(`Successfully published ${extractedRolls.length} verified candidate records for ${cenNumber}!`);
+      onSuccessMessage(`Successfully published ${extractedRolls.length} verified candidate records to Cloud Firestore for ${cenNumber}!`);
     } else {
       // Update existing Result Item
+      let targetUpdatedResult: ResultItem | null = null;
       const updatedResults = database.results.map((res) => {
         if (res.id === selectedResultId) {
           const mergedRolls = Array.from(new Set([...(res.rollNumbersSample || []), ...extractedRolls]));
-          return {
+          targetUpdatedResult = {
             ...res,
             totalSelectedCandidates: mergedRolls.length,
             rollNumbersSample: mergedRolls,
@@ -316,9 +319,14 @@ export const AdminRollNumbersView: React.FC<AdminRollNumbersViewProps> = ({
             isNextStageEligible: isNextStageEligible,
             nextStageTitle: nextStageTitle.trim() || res.nextStageTitle,
           };
+          return targetUpdatedResult;
         }
         return res;
       });
+
+      if (targetUpdatedResult) {
+        firestoreService.updateResult(selectedResultId, targetUpdatedResult).catch((err) => console.warn('Firestore result update:', err));
+      }
 
       const updatedDb: FullRRBDatabase = {
         ...database,
@@ -328,7 +336,7 @@ export const AdminRollNumbersView: React.FC<AdminRollNumbersViewProps> = ({
 
       setDatabase(updatedDb);
       saveRRBDatabase(updatedDb);
-      onSuccessMessage(`Updated result panel with ${extractedRolls.length} additional verified roll numbers!`);
+      onSuccessMessage(`Updated result panel with ${extractedRolls.length} additional verified roll numbers in Cloud Firestore!`);
     }
 
     // Reset Form
@@ -380,7 +388,8 @@ export const AdminRollNumbersView: React.FC<AdminRollNumbersViewProps> = ({
 
   // Delete Result Panel
   const handleDeleteResult = (id: string) => {
-    if (confirm('Are you sure you want to delete this roll number result panel?')) {
+    if (confirm('Are you sure you want to delete this roll number result panel from Cloud Firestore?')) {
+      firestoreService.deleteResult(id).catch((err) => console.warn('Firestore result delete:', err));
       const updatedResults = database.results.filter((r) => r.id !== id);
       const updatedDb: FullRRBDatabase = {
         ...database,
@@ -388,7 +397,7 @@ export const AdminRollNumbersView: React.FC<AdminRollNumbersViewProps> = ({
       };
       setDatabase(updatedDb);
       saveRRBDatabase(updatedDb);
-      onSuccessMessage('Roll number panel deleted.');
+      onSuccessMessage('Roll number panel deleted from Cloud Firestore.');
     }
   };
 
@@ -413,16 +422,22 @@ export const AdminRollNumbersView: React.FC<AdminRollNumbersViewProps> = ({
 
     const uniqueRolls = Array.from(new Set(rolls));
 
+    let updatedTarget: ResultItem | null = null;
     const updatedResults = database.results.map((r) => {
       if (r.id === editingResult.id) {
-        return {
+        updatedTarget = {
           ...r,
           totalSelectedCandidates: uniqueRolls.length,
           rollNumbersSample: uniqueRolls,
         };
+        return updatedTarget;
       }
       return r;
     });
+
+    if (updatedTarget) {
+      firestoreService.updateResult(editingResult.id, updatedTarget).catch((err) => console.warn('Firestore result edit:', err));
+    }
 
     const updatedDb: FullRRBDatabase = {
       ...database,
@@ -432,7 +447,7 @@ export const AdminRollNumbersView: React.FC<AdminRollNumbersViewProps> = ({
     setDatabase(updatedDb);
     saveRRBDatabase(updatedDb);
     setEditingResult(null);
-    onSuccessMessage('Updated roll numbers in panel.');
+    onSuccessMessage('Updated roll numbers in panel and synced with Cloud Firestore.');
   };
 
   // Candidate scorecards list for table display

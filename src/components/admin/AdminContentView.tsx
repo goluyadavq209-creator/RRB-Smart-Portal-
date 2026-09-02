@@ -2,16 +2,23 @@ import React, { useState } from 'react';
 import { Newspaper, Link2, ExternalLink, Plus, Edit3, Trash2, Globe } from 'lucide-react';
 import { FullRRBDatabase, CandidatePortalLink } from '../../types';
 import { saveRRBDatabase } from '../../utils/storage';
+import { firestoreService } from '../../services/firestoreService';
 
 interface AdminContentViewProps {
   database: FullRRBDatabase;
+  setDatabase?: (db: FullRRBDatabase) => void;
   onSuccessMessage: (msg: string) => void;
 }
 
-export const AdminContentView: React.FC<AdminContentViewProps> = ({ database, onSuccessMessage }) => {
+export const AdminContentView: React.FC<AdminContentViewProps> = ({ database, setDatabase, onSuccessMessage }) => {
   const [links, setLinks] = useState<CandidatePortalLink[]>(
     database.portalLinks || []
   );
+
+  // Synchronize when central database updates from cloud or other devices
+  React.useEffect(() => {
+    setLinks(database.portalLinks || []);
+  }, [database.portalLinks]);
 
   const [showModal, setShowModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -41,16 +48,19 @@ export const AdminContentView: React.FC<AdminContentViewProps> = ({ database, on
       ...database,
       portalLinks: updatedLinks,
     };
+    firestoreService.createPortalLink(newLink).catch((e) => console.warn('Firestore link write:', e));
     saveRRBDatabase(updatedDb);
+    if (setDatabase) setDatabase(updatedDb);
 
     setNewTitle('');
     setNewUrl('');
     setNewExam('');
     setShowModal(false);
-    onSuccessMessage('Official candidate link added and persisted successfully.');
+    onSuccessMessage('Official candidate link added to Cloud Firestore successfully.');
   };
 
   const handleDelete = (id: string) => {
+    firestoreService.deletePortalLink(id).catch((e) => console.warn('Firestore link delete:', e));
     const updatedLinks = links.filter((l) => l.id !== id);
     setLinks(updatedLinks);
     const updatedDb: FullRRBDatabase = {
@@ -58,7 +68,8 @@ export const AdminContentView: React.FC<AdminContentViewProps> = ({ database, on
       portalLinks: updatedLinks,
     };
     saveRRBDatabase(updatedDb);
-    onSuccessMessage('Official link removed.');
+    if (setDatabase) setDatabase(updatedDb);
+    onSuccessMessage('Official link removed from Cloud Firestore.');
   };
 
   return (

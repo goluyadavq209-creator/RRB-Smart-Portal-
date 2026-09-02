@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Layers, Plus, Search, Edit3, Trash2, CheckCircle2, FileText, Calendar, Users } from 'lucide-react';
 import { FullRRBDatabase, ExamItem, ExamStatus } from '../../types';
 import { saveRRBDatabase } from '../../utils/storage';
+import { firestoreService } from '../../services/firestoreService';
 
 interface AdminExamsViewProps {
   database: FullRRBDatabase;
@@ -36,9 +37,61 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({ database, setDat
       e.cenNumber.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleStartEdit = (exam: ExamItem) => {
+    setEditingExam(exam);
+    setNewExam({
+      cenNumber: exam.cenNumber,
+      title: exam.title,
+      shortCode: exam.shortCode,
+      department: exam.department,
+      status: exam.status,
+      totalVacancies: exam.totalVacancies,
+      applicationStart: exam.applicationStart,
+      applicationEnd: exam.applicationEnd,
+      examDates: exam.examDates,
+      eligibility: exam.eligibility,
+      payScale: exam.payScale,
+      selectionStages: exam.selectionStages,
+      description: exam.description,
+    });
+    setShowAddModal(true);
+  };
+
   const handleSaveExam = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newExam.title || !newExam.cenNumber) return;
+
+    if (editingExam) {
+      const updatedExam: ExamItem = {
+        ...editingExam,
+        cenNumber: newExam.cenNumber || editingExam.cenNumber,
+        title: newExam.title,
+        shortCode: newExam.shortCode || editingExam.shortCode,
+        department: newExam.department || editingExam.department,
+        status: (newExam.status as ExamStatus) || editingExam.status,
+        totalVacancies: Number(newExam.totalVacancies) || editingExam.totalVacancies,
+        applicationStart: newExam.applicationStart,
+        applicationEnd: newExam.applicationEnd,
+        examDates: newExam.examDates,
+        eligibility: newExam.eligibility,
+        payScale: newExam.payScale,
+        description: newExam.description,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const updated = {
+        ...database,
+        exams: database.exams.map((ex) => (ex.id === editingExam.id ? updatedExam : ex)),
+      };
+
+      firestoreService.updateExam(editingExam.id, updatedExam).catch((e) => console.warn('Firestore direct exam update:', e));
+      saveRRBDatabase(updated);
+      setDatabase(updated);
+      setShowAddModal(false);
+      setEditingExam(null);
+      onSuccessMessage(`Updated CEN Exam in Cloud Firestore: "${updatedExam.title}"`);
+      return;
+    }
 
     const examToAdd: ExamItem = {
       id: `exam-${Date.now()}`,
@@ -63,21 +116,23 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({ database, setDat
       exams: [examToAdd, ...database.exams],
     };
 
+    firestoreService.createExam(examToAdd).catch((e) => console.warn('Firestore direct exam write:', e));
     saveRRBDatabase(updated);
     setDatabase(updated);
     setShowAddModal(false);
-    onSuccessMessage(`Added CEN Exam: "${examToAdd.title}"`);
+    onSuccessMessage(`Added CEN Exam to Cloud Firestore: "${examToAdd.title}"`);
   };
 
   const handleDelete = (id: string, title: string) => {
-    if (window.confirm(`Delete exam "${title}"?`)) {
+    if (window.confirm(`Delete exam "${title}" from Cloud Firestore permanently?`)) {
+      firestoreService.deleteExam(id).catch((e) => console.warn('Firestore direct exam delete:', e));
       const updated = {
         ...database,
         exams: database.exams.filter((e) => e.id !== id),
       };
       saveRRBDatabase(updated);
       setDatabase(updated);
-      onSuccessMessage(`Removed exam: "${title}"`);
+      onSuccessMessage(`Removed exam from Firestore: "${title}"`);
     }
   };
 
@@ -174,13 +229,22 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({ database, setDat
 
               <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
                 <span className="text-slate-400">Stages: {exam.selectionStages?.join(' → ')}</span>
-                <button
-                  onClick={() => handleDelete(exam.id, exam.title)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                  title="Delete exam"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center space-x-1">
+                  <button
+                    onClick={() => handleStartEdit(exam)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                    title="Edit exam"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(exam.id, exam.title)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                    title="Delete exam"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -191,7 +255,9 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({ database, setDat
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 border border-slate-200 shadow-2xl space-y-4">
-            <h3 className="font-extrabold text-base text-slate-900">Add New CEN Recruitment Exam</h3>
+            <h3 className="font-extrabold text-base text-slate-900">
+              {editingExam ? 'Edit CEN Recruitment Exam' : 'Add New CEN Recruitment Exam'}
+            </h3>
 
             <form onSubmit={handleSaveExam} className="space-y-3 text-xs">
               <div>
@@ -245,16 +311,19 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({ database, setDat
               <div className="flex gap-2 pt-3">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-100 font-bold text-slate-700"
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setEditingExam(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-100 font-bold text-slate-700 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold"
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold cursor-pointer"
                 >
-                  Create Exam
+                  {editingExam ? 'Save Changes' : 'Create Exam'}
                 </button>
               </div>
             </form>

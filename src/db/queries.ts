@@ -17,10 +17,40 @@ export async function getPortalDatabaseFromDB() {
   try {
     const result = await db.select().from(portalDatabase).where(eq(portalDatabase.key, 'main_rrb_database')).limit(1);
     if (!result || result.length === 0) {
-      return null;
+      // Auto seed default authentic official database to Cloud SQL PostgreSQL
+      const { DEFAULT_OFFICIAL_PORTAL_DATABASE } = await import('../data/defaultData.ts');
+      const saved = await savePortalDatabaseToDB(DEFAULT_OFFICIAL_PORTAL_DATABASE, 'System (Initial Seed)');
+      return {
+        data: DEFAULT_OFFICIAL_PORTAL_DATABASE,
+        version: saved.record.version,
+        updatedAt: saved.record.updatedAt,
+        updatedBy: saved.record.updatedBy,
+      };
     }
     const record = result[0];
     const parsedData = JSON.parse(record.data);
+
+    // If database exists but was cleared or has zero exams & cutoffs, heal and repopulate with official records
+    if ((!parsedData.exams || parsedData.exams.length === 0) && (!parsedData.cutoffs || parsedData.cutoffs.length === 0)) {
+      const { DEFAULT_OFFICIAL_PORTAL_DATABASE } = await import('../data/defaultData.ts');
+      parsedData.exams = DEFAULT_OFFICIAL_PORTAL_DATABASE.exams;
+      parsedData.cutoffs = DEFAULT_OFFICIAL_PORTAL_DATABASE.cutoffs;
+      parsedData.notices = parsedData.notices && parsedData.notices.length > 0 ? parsedData.notices : DEFAULT_OFFICIAL_PORTAL_DATABASE.notices;
+      parsedData.results = parsedData.results && parsedData.results.length > 0 ? parsedData.results : DEFAULT_OFFICIAL_PORTAL_DATABASE.results;
+      parsedData.portalLinks = parsedData.portalLinks && parsedData.portalLinks.length > 0 ? parsedData.portalLinks : DEFAULT_OFFICIAL_PORTAL_DATABASE.portalLinks;
+      parsedData.zones = DEFAULT_OFFICIAL_PORTAL_DATABASE.zones;
+      if (!parsedData.settings) {
+        parsedData.settings = DEFAULT_OFFICIAL_PORTAL_DATABASE.settings;
+      }
+      const reSaved = await savePortalDatabaseToDB(parsedData, 'System (Auto-Healed Records)');
+      return {
+        data: parsedData,
+        version: reSaved.record.version,
+        updatedAt: reSaved.record.updatedAt,
+        updatedBy: reSaved.record.updatedBy,
+      };
+    }
+
     return {
       data: parsedData,
       version: record.version,

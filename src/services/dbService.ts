@@ -1,5 +1,6 @@
 import { FullRRBDatabase, ExamItem, CutoffRecord, NoticeItem, ResultItem, CandidatePortalLink } from '../types';
 import { INITIAL_EMPTY_DATABASE, OFFICIAL_RRB_ZONES, DEFAULT_CANDIDATE_PORTAL_LINKS } from '../data/defaultData';
+import { firestoreService } from './firestoreService';
 
 export interface DatabaseSyncResult {
   success: boolean;
@@ -40,37 +41,20 @@ export interface MigrationReport {
   error?: string;
 }
 
-const MEMORY_FALLBACK_KEY = 'rrb_db_transient_cache_v4';
-
 /**
- * Clean Database Service Layer
- * Interacts directly with Cloud SQL PostgreSQL API for shared persistence.
+ * Clean Central Database Service Layer
+ * Firestore is the single source of truth for all shared portal data.
  */
 class DatabaseService {
   private inMemoryCache: FullRRBDatabase | null = null;
-  private lastVersion: string = 'initial';
+  private lastVersion: string = 'firestore-v4';
   private lastUpdatedAt: string | null = null;
-  private isSaving: boolean = false;
-  private syncListeners: Array<(db: FullRRBDatabase) => void> = [];
 
   /**
-   * Subscribe to real-time database changes across tabs and polling
+   * Subscribe to real-time Firestore database changes across all clients and tabs
    */
   public subscribe(listener: (db: FullRRBDatabase) => void): () => void {
-    this.syncListeners.push(listener);
-    return () => {
-      this.syncListeners = this.syncListeners.filter((l) => l !== listener);
-    };
-  }
-
-  private notifyListeners(db: FullRRBDatabase) {
-    this.syncListeners.forEach((listener) => {
-      try {
-        listener(db);
-      } catch (err) {
-        console.error('Error in database sync listener:', err);
-      }
-    });
+    return firestoreService.subscribe(listener);
   }
 
   /**
@@ -94,11 +78,11 @@ class DatabaseService {
 
     return {
       metadata: {
-        version: raw.metadata?.version || '4.0.0-PROD',
+        version: raw.metadata?.version || '4.2.0-FIRESTORE',
         lastUpdated: raw.metadata?.lastUpdated || new Date().toISOString(),
         uploadedBy: raw.metadata?.uploadedBy || 'Official Admin',
-        source: raw.metadata?.source || 'Railway Recruitment Board Official Portal',
-        notes: raw.metadata?.notes || 'Cloud SQL PostgreSQL Managed Dataset',
+        source: raw.metadata?.source || 'Railway Recruitment Board Firestore Cloud Database',
+        notes: raw.metadata?.notes || 'Direct Cloud Firestore Persistent Sync',
       },
       settings: raw.settings || INITIAL_EMPTY_DATABASE.settings,
       zones: Array.isArray(raw.zones) && raw.zones.length > 0 ? raw.zones : OFFICIAL_RRB_ZONES,
@@ -112,337 +96,201 @@ class DatabaseService {
   }
 
   /**
-   * Fetch full central dataset from Cloud SQL database API
+   * Fetch full central dataset directly from Cloud Firestore
    */
   public async fetchDatabase(): Promise<DatabaseSyncResult> {
     try {
-      const response = await fetch(`/api/database?t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-        },
-      });
+      const freshDb = await firestoreService.fetchFullDatabase();
+      const normalized = this.normalizeDatabase(freshDb);
+      this.inMemoryCache = normalized;
+      this.lastUpdatedAt = normalized.metadata.lastUpdated;
 
-      if (!response.ok) {
-        throw new Error(`HTTP Error ${response.status}: Failed to reach Cloud SQL API`);
-      }
-
-      const json = await response.json();
-
-      if (json.exists && json.data) {
-        const normalized = this.normalizeDatabase(json.data);
-        this.inMemoryCache = normalized;
-        this.lastVersion = json.version || 'v4-prod';
-        this.lastUpdatedAt = json.updatedAt || new Date().toISOString();
-
-        // Save transient backup cache for offline network resiliency only
-        try {
-          sessionStorage.setItem(MEMORY_FALLBACK_KEY, JSON.stringify(normalized));
-        } catch {}
-
-        return {
-          success: true,
-          data: normalized,
-          version: this.lastVersion,
-          updatedAt: this.lastUpdatedAt,
-          updatedBy: json.updatedBy || 'Admin',
-        };
-      }
-
-      // No custom DB uploaded yet in Cloud SQL: return default initial sanitized schema
-      const initialDb = INITIAL_EMPTY_DATABASE;
-      this.inMemoryCache = initialDb;
       return {
         success: true,
-        data: initialDb,
-        version: 'initial',
-        updatedAt: null,
-        updatedBy: 'System',
+        data: normalized,
+        version: this.lastVersion,
+        updatedAt: this.lastUpdatedAt,
+        updatedBy: 'Cloud Firestore',
       };
     } catch (error: any) {
-      console.warn('Cloud SQL API fetch error, checking transient session fallback:', error);
-      
-      // Fallback to in-memory or transient session storage for network hiccups
-      if (this.inMemoryCache) {
-        return {
-          success: false,
-          data: this.inMemoryCache,
-          version: this.lastVersion,
-          updatedAt: this.lastUpdatedAt,
-          updatedBy: 'System (Cached)',
-          fromCache: true,
-          error: error.message,
-        };
-      }
-
-      try {
-        const sessionRaw = sessionStorage.getItem(MEMORY_FALLBACK_KEY);
-        if (sessionRaw) {
-          const parsed = this.normalizeDatabase(JSON.parse(sessionRaw));
-          return {
-            success: false,
-            data: parsed,
-            version: 'session-cache',
-            updatedAt: null,
-            updatedBy: 'Session Cache',
-            fromCache: true,
-            error: error.message,
-          };
-        }
-      } catch {}
-
+      console.warn('Firestore fetch error, using in-memory cache:', error);
       return {
         success: false,
-        data: INITIAL_EMPTY_DATABASE,
-        version: 'error-fallback',
-        updatedAt: null,
-        updatedBy: 'System',
-        error: error.message || 'Network error connecting to database',
+        data: this.inMemoryCache || INITIAL_EMPTY_DATABASE,
+        version: this.lastVersion,
+        updatedAt: this.lastUpdatedAt,
+        updatedBy: 'System (Cached)',
+        fromCache: true,
+        error: error.message || 'Database error',
       };
     }
   }
 
   /**
-   * Save database changes to Cloud SQL PostgreSQL permanently with optimistic UI rollback support
+   * Save database changes to Cloud Firestore permanently
    */
   public async saveDatabase(
     newDatabase: FullRRBDatabase,
     options: SaveDatabaseOptions = {}
   ): Promise<{ success: boolean; version?: string; error?: string }> {
-    if (this.isSaving) {
-      // Allow rapid saves via queue or debounce
-    }
-
-    this.isSaving = true;
-    const previousCache = this.inMemoryCache ? { ...this.inMemoryCache } : null;
-
     try {
       const normalized = this.normalizeDatabase(newDatabase);
-      normalized.metadata.lastUpdated = new Date().toISOString();
-      this.inMemoryCache = normalized;
-      this.notifyListeners(normalized);
+      const res = await firestoreService.saveFullDatabaseToFirestore(normalized);
 
-      // Save to transient session cache
-      try {
-        sessionStorage.setItem(MEMORY_FALLBACK_KEY, JSON.stringify(normalized));
-      } catch {}
-
-      const response = await fetch('/api/database', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          database: normalized,
-          updatedBy: options.updatedBy || 'Admin',
-          notification: options.notification || {
-            title: '📢 RRB Portal Updates Published',
-            message: 'Official exam links, notices, and cut-off marks have been updated.',
-            category: 'notice',
-            targetTab: 'notices',
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const errorJson = await response.json().catch(() => ({}));
-        throw new Error(errorJson.error || `Server returned ${response.status} on database save`);
+      if (!res.success) {
+        return { success: false, error: res.error || 'Could not persist data to Firestore.' };
       }
 
-      const resData = await response.json();
-      this.lastVersion = resData.version || `v4.${Date.now()}`;
-      this.lastUpdatedAt = resData.updatedAt || new Date().toISOString();
-      this.isSaving = false;
+      this.inMemoryCache = normalized;
+      this.lastUpdatedAt = new Date().toISOString();
 
-      // Broadcast update event to all local components
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('rrb_database_updated', { detail: { database: normalized } }));
+      // Broadcast local event for notification banner if requested
+      if (typeof window !== 'undefined' && options.notification) {
+        window.dispatchEvent(new CustomEvent('rrb_notifications_updated', {
+          detail: {
+            notification: {
+              id: `notif-${Date.now()}`,
+              title: options.notification.title,
+              message: options.notification.message,
+              category: options.notification.category || 'notice',
+              targetTab: options.notification.targetTab || 'notices',
+              timestamp: new Date().toISOString(),
+              read: false,
+              badgeText: 'Live Firestore Update',
+            }
+          }
+        }));
       }
 
       return {
         success: true,
-        version: this.lastVersion,
+        version: `firestore-${Date.now()}`,
       };
     } catch (error: any) {
-      this.isSaving = false;
-      console.error('Failed to save to Cloud SQL database:', error);
-
-      // Rollback optimistic state if previousCache existed
-      if (previousCache) {
-        this.inMemoryCache = previousCache;
-        this.notifyListeners(previousCache);
-      }
-
+      console.error('Failed to save to Cloud Firestore:', error);
       return {
         success: false,
-        error: error.message || 'Could not persist data to Cloud SQL database.',
+        error: error.message || 'Could not persist data to Cloud Firestore.',
       };
     }
   }
 
   /**
-   * Migrate and Deduplicate data from local/external source into Cloud SQL PostgreSQL database
+   * Migrate and Deduplicate data from local/external source into Cloud Firestore database
    */
-  public async migrateToCloudDatabase(sourceData: FullRRBDatabase | any): Promise<MigrationReport> {
-    try {
-      const normalizedSource = this.normalizeDatabase(sourceData);
+  public async migrateToCloudDatabase(externalData: FullRRBDatabase): Promise<MigrationReport> {
+    const raw = externalData;
+    let duplicatesRemoved = 0;
 
-      // Fetch current Cloud SQL dataset to merge without duplicates
-      const currentRes = await this.fetchDatabase();
-      const currentDb = currentRes.data || INITIAL_EMPTY_DATABASE;
+    // Deduplicate Exams by CEN Number or ID
+    const examMap = new Map<string, ExamItem>();
+    (raw.exams || []).forEach((e) => {
+      const key = (e.cenNumber || e.id || e.title).trim().toLowerCase();
+      if (examMap.has(key)) duplicatesRemoved++;
+      examMap.set(key, e);
+    });
 
-      let duplicatesCount = 0;
+    // Deduplicate Cutoffs by cenNumber + zoneCode + postName + stage
+    const cutoffMap = new Map<string, CutoffRecord>();
+    (raw.cutoffs || []).forEach((c) => {
+      const key = `${c.cenNumber}_${c.zoneCode}_${c.postName}_${c.stage}`.toLowerCase();
+      if (cutoffMap.has(key)) duplicatesRemoved++;
+      cutoffMap.set(key, c);
+    });
 
-      // Deduplicate Exams by cenNumber or id
-      const existingExamKeys = new Set(currentDb.exams.map((e) => `${e.cenNumber}_${e.shortCode}`.toLowerCase()));
-      const mergedExams = [...currentDb.exams];
-      for (const ex of normalizedSource.exams) {
-        const key = `${ex.cenNumber}_${ex.shortCode}`.toLowerCase();
-        if (existingExamKeys.has(key)) {
-          duplicatesCount++;
-        } else {
-          existingExamKeys.add(key);
-          mergedExams.push(ex);
-        }
-      }
+    // Deduplicate Notices by title or ID
+    const noticeMap = new Map<string, NoticeItem>();
+    (raw.notices || []).forEach((n) => {
+      const key = (n.id || n.title).trim().toLowerCase();
+      if (noticeMap.has(key)) duplicatesRemoved++;
+      noticeMap.set(key, n);
+    });
 
-      // Deduplicate Cutoffs by cenNumber, zoneCode, postName, stage
-      const existingCutoffKeys = new Set(
-        currentDb.cutoffs.map((c) => `${c.cenNumber}_${c.zoneCode}_${c.postName}_${c.stage}_${c.year}`.toLowerCase())
-      );
-      const mergedCutoffs = [...currentDb.cutoffs];
-      for (const ct of normalizedSource.cutoffs) {
-        const key = `${ct.cenNumber}_${ct.zoneCode}_${ct.postName}_${ct.stage}_${ct.year}`.toLowerCase();
-        if (existingCutoffKeys.has(key)) {
-          duplicatesCount++;
-        } else {
-          existingCutoffKeys.add(key);
-          mergedCutoffs.push(ct);
-        }
-      }
+    // Deduplicate Results by cenNumber + zoneCode + stage
+    const resultMap = new Map<string, ResultItem>();
+    (raw.results || []).forEach((r) => {
+      const key = `${r.cenNumber}_${r.zoneCode}_${r.stage}_${r.type}`.toLowerCase();
+      if (resultMap.has(key)) duplicatesRemoved++;
+      resultMap.set(key, r);
+    });
 
-      // Deduplicate Notices by title and publishDate
-      const existingNoticeKeys = new Set(
-        currentDb.notices.map((n) => `${n.title}_${n.publishDate}`.toLowerCase())
-      );
-      const mergedNotices = [...currentDb.notices];
-      for (const nt of normalizedSource.notices) {
-        const key = `${nt.title}_${nt.publishDate}`.toLowerCase();
-        if (existingNoticeKeys.has(key)) {
-          duplicatesCount++;
-        } else {
-          existingNoticeKeys.add(key);
-          mergedNotices.push(nt);
-        }
-      }
+    // Deduplicate Portal Links by URL
+    const linksMap = new Map<string, CandidatePortalLink>();
+    (raw.portalLinks || []).forEach((l) => {
+      const key = l.url.trim().toLowerCase();
+      if (linksMap.has(key)) duplicatesRemoved++;
+      linksMap.set(key, l);
+    });
 
-      // Deduplicate Results by cenNumber, zoneCode, stage
-      const existingResultKeys = new Set(
-        currentDb.results.map((r) => `${r.cenNumber}_${r.zoneCode}_${r.stage}_${r.publishDate}`.toLowerCase())
-      );
-      const mergedResults = [...currentDb.results];
-      for (const rs of normalizedSource.results) {
-        const key = `${rs.cenNumber}_${rs.zoneCode}_${rs.stage}_${rs.publishDate}`.toLowerCase();
-        if (existingResultKeys.has(key)) {
-          duplicatesCount++;
-        } else {
-          existingResultKeys.add(key);
-          mergedResults.push(rs);
-        }
-      }
+    const cleanExams = Array.from(examMap.values());
+    const cleanCutoffs = Array.from(cutoffMap.values());
+    const cleanNotices = Array.from(noticeMap.values());
+    const cleanResults = Array.from(resultMap.values());
+    const cleanLinks = Array.from(linksMap.values());
 
-      // Deduplicate Portal Links by url
-      const existingLinkUrls = new Set(currentDb.portalLinks.map((l) => l.url.trim().toLowerCase()));
-      const mergedLinks = [...currentDb.portalLinks];
-      for (const pl of normalizedSource.portalLinks) {
-        const key = pl.url.trim().toLowerCase();
-        if (existingLinkUrls.has(key)) {
-          duplicatesCount++;
-        } else {
-          existingLinkUrls.add(key);
-          mergedLinks.push(pl);
-        }
-      }
+    const mergedDatabase: FullRRBDatabase = {
+      metadata: {
+        version: `4.2.0-FIRESTORE-${Date.now()}`,
+        lastUpdated: new Date().toISOString(),
+        uploadedBy: 'Portal Admin (Firestore Migration)',
+        source: 'Railway Recruitment Board Firestore Central Cloud DB',
+        notes: 'Sanitized and deduplicated dataset migrated to Cloud Firestore.',
+      },
+      settings: raw.settings || INITIAL_EMPTY_DATABASE.settings,
+      zones: OFFICIAL_RRB_ZONES,
+      exams: cleanExams,
+      cutoffs: cleanCutoffs,
+      notices: cleanNotices,
+      results: cleanResults,
+      portalLinks: cleanLinks.length > 0 ? cleanLinks : DEFAULT_CANDIDATE_PORTAL_LINKS,
+      candidateScorecards: raw.candidateScorecards || [],
+    };
 
-      const mergedDatabase: FullRRBDatabase = {
-        metadata: {
-          version: `migrated-${Date.now()}`,
-          lastUpdated: new Date().toISOString(),
-          uploadedBy: 'Admin Cloud Migration Engine',
-          source: 'Cloud SQL PostgreSQL Live Sync',
-          notes: `Successfully migrated and deduplicated. Removed ${duplicatesCount} redundant entries.`,
-        },
-        settings: normalizedSource.settings || currentDb.settings,
-        zones: currentDb.zones.length > 0 ? currentDb.zones : OFFICIAL_RRB_ZONES,
-        exams: mergedExams,
-        cutoffs: mergedCutoffs,
-        notices: mergedNotices,
-        results: mergedResults,
-        portalLinks: mergedLinks,
-        candidateScorecards: currentDb.candidateScorecards || [],
-      };
+    const saveResult = await this.saveDatabase(mergedDatabase, {
+      updatedBy: 'Admin (Migration)',
+      notification: {
+        title: '🚀 Cloud Firestore Migration Complete',
+        message: `Migrated ${cleanExams.length} exams, ${cleanNotices.length} notices, and ${cleanCutoffs.length} cutoffs to Firestore.`,
+        category: 'notice',
+        targetTab: 'notices',
+      },
+    });
 
-      // Persist to Cloud SQL PostgreSQL
-      const saveRes = await this.saveDatabase(mergedDatabase, {
-        updatedBy: 'Admin Migration Tool',
-        notification: {
-          title: '🚀 Cloud Database Migration Completed',
-          message: `Portal database migrated to Cloud SQL with ${mergedExams.length} exams, ${mergedCutoffs.length} cutoffs, ${mergedNotices.length} notices, and ${mergedLinks.length} portal links.`,
-          category: 'admin',
-          targetTab: 'notices',
-        },
-      });
-
-      if (!saveRes.success) {
-        throw new Error(saveRes.error || 'Failed to save migrated database to Cloud SQL');
-      }
-
-      const totalCount = mergedExams.length + mergedCutoffs.length + mergedNotices.length + mergedResults.length + mergedLinks.length;
-
-      return {
-        success: true,
-        migratedCounts: {
-          exams: mergedExams.length,
-          cutoffs: mergedCutoffs.length,
-          notices: mergedNotices.length,
-          results: mergedResults.length,
-          portalLinks: mergedLinks.length,
-          zones: mergedDatabase.zones.length,
-          total: totalCount,
-        },
-        duplicatesRemoved: duplicatesCount,
-        version: saveRes.version || 'v4-migrated',
-        timestamp: new Date().toISOString(),
-      };
-    } catch (error: any) {
+    if (!saveResult.success) {
       return {
         success: false,
-        migratedCounts: { exams: 0, cutoffs: 0, notices: 0, results: 0, portalLinks: 0, zones: 0, total: 0 },
-        duplicatesRemoved: 0,
+        migratedCounts: {
+          exams: 0,
+          cutoffs: 0,
+          notices: 0,
+          results: 0,
+          portalLinks: 0,
+          zones: 0,
+          total: 0,
+        },
+        duplicatesRemoved,
         version: 'failed',
         timestamp: new Date().toISOString(),
-        error: error.message || 'Migration failed',
+        error: saveResult.error || 'Failed to save migrated dataset to Firestore',
       };
     }
-  }
 
-  /**
-   * Fast status check for poller
-   */
-  public async checkStatus(): Promise<{ version: string; updatedAt: string | null; latestNotification: any }> {
-    try {
-      const res = await fetch('/api/database/status', {
-        cache: 'no-store',
-      });
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {}
+    const total = cleanExams.length + cleanCutoffs.length + cleanNotices.length + cleanResults.length + cleanLinks.length;
+
     return {
-      version: this.lastVersion,
-      updatedAt: this.lastUpdatedAt,
-      latestNotification: null,
+      success: true,
+      migratedCounts: {
+        exams: cleanExams.length,
+        cutoffs: cleanCutoffs.length,
+        notices: cleanNotices.length,
+        results: cleanResults.length,
+        portalLinks: cleanLinks.length,
+        zones: OFFICIAL_RRB_ZONES.length,
+        total,
+      },
+      duplicatesRemoved,
+      version: saveResult.version || 'firestore-migrated',
+      timestamp: new Date().toISOString(),
     };
   }
 }

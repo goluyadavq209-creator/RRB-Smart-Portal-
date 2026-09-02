@@ -25,6 +25,7 @@ import {
 import { FullRRBDatabase } from '../../types';
 import { exportDatabaseAsJson, validateAndParseRRBJson, loadSampleDataset, saveRRBDatabase, migrateLocalToCloudDatabase } from '../../utils/storage';
 import { dbService, MigrationReport } from '../../services/dbService';
+import { firestoreService } from '../../services/firestoreService';
 
 interface AdminBackupViewProps {
   database: FullRRBDatabase;
@@ -79,11 +80,12 @@ export const AdminBackupView: React.FC<AdminBackupViewProps> = ({ database, setD
         if (validation.isValid && validation.parsedData) {
           setIsMigrating(true);
           const report = await migrateLocalToCloudDatabase(validation.parsedData);
+          firestoreService.saveFullDatabaseToFirestore(validation.parsedData).catch((e) => console.warn('Firestore backup sync:', e));
           setIsMigrating(false);
           setMigrationReport(report);
           if (report.success) {
             setDatabase(validation.parsedData);
-            onSuccessMessage(`Database migrated & persisted to Cloud SQL (${report.migratedCounts.total} total records).`);
+            onSuccessMessage(`Database migrated & persisted to Cloud Firestore & Cloud SQL (${report.migratedCounts.total} total records).`);
             fetchCloudStatus();
           } else {
             alert(`Migration to Cloud SQL failed: ${report.error}`);
@@ -103,9 +105,10 @@ export const AdminBackupView: React.FC<AdminBackupViewProps> = ({ database, setD
     setIsMigrating(true);
     try {
       const report = await migrateLocalToCloudDatabase(database);
+      await firestoreService.saveFullDatabaseToFirestore(database);
       setMigrationReport(report);
       if (report.success) {
-        onSuccessMessage(`Cloud SQL Database Synced: ${report.migratedCounts.total} records saved, ${report.duplicatesRemoved} duplicates pruned.`);
+        onSuccessMessage(`Cloud Database Synced: ${report.migratedCounts.total} records saved to Cloud Firestore & Cloud SQL.`);
         fetchCloudStatus();
       } else {
         alert(`Cloud Migration failed: ${report.error}`);
@@ -118,16 +121,17 @@ export const AdminBackupView: React.FC<AdminBackupViewProps> = ({ database, setD
   };
 
   const handleReset = async () => {
-    if (window.confirm('Are you sure you want to reset the Central Database to standard official RRB sample records in Cloud SQL?')) {
+    if (window.confirm('Are you sure you want to reset the Central Database to standard official RRB sample records in Cloud Firestore?')) {
       const def = loadSampleDataset();
       setDatabase(def);
+      await firestoreService.saveFullDatabaseToFirestore(def);
       await saveRRBDatabase(def, {
         title: '🔄 RRB Database Initialized',
         message: 'Central portal database reset to standard Railway Board template.',
         category: 'admin',
         targetTab: 'home',
       });
-      onSuccessMessage('Database reset to official default data records in Cloud SQL.');
+      onSuccessMessage('Database reset to official default data records in Cloud Firestore.');
       fetchCloudStatus();
     }
   };

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Settings, Save, Shield, Database, Cpu, Globe, Sliders, AlertTriangle, Radio } from 'lucide-react';
-import { FullRRBDatabase } from '../../types';
+import { FullRRBDatabase, SiteSettings } from '../../types';
+import { saveRRBDatabase } from '../../utils/storage';
+import { firestoreService } from '../../services/firestoreService';
 
 interface AdminSettingsViewProps {
   database: FullRRBDatabase;
@@ -26,27 +28,36 @@ export const AdminSettingsView: React.FC<AdminSettingsViewProps> = ({
   const [supportContactEmail, setSupportContactEmail] = useState(database.settings?.supportContactEmail || 'helpdesk@rrb.gov.in');
   const [telegramChannelUrl, setTelegramChannelUrl] = useState(database.settings?.telegramChannelUrl || 'https://t.me/railway_recruitment_updates');
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (setDatabase) {
-      const updatedDb: FullRRBDatabase = {
-        ...database,
-        settings: {
-          isWebsiteLive,
-          maintenanceTitle,
-          maintenanceMessage,
-          expectedLaunchDate,
-          supportContactEmail,
-          telegramChannelUrl,
-        },
-      };
-      setDatabase(updatedDb);
+    const newSettings: SiteSettings = {
+      isWebsiteLive,
+      maintenanceTitle,
+      maintenanceMessage,
+      expectedLaunchDate,
+      supportContactEmail,
+      telegramChannelUrl,
+    };
+
+    const updatedDb: FullRRBDatabase = {
+      ...database,
+      settings: newSettings,
+    };
+
+    saveRRBDatabase(updatedDb);
+    if (setDatabase) setDatabase(updatedDb);
+
+    try {
+      await firestoreService.updatePortalSettings(newSettings);
+      onSuccessMessage(
+        isWebsiteLive
+          ? 'Settings saved to Cloud Firestore! Website is LIVE for all users.'
+          : 'Settings saved to Cloud Firestore! Website is in OFF / Coming Soon Mode.'
+      );
+    } catch (err: any) {
+      console.warn('Failed to save settings to Firestore:', err);
+      onSuccessMessage('Settings saved locally. Firestore sync pending authorization.');
     }
-    onSuccessMessage(
-      isWebsiteLive
-        ? 'Settings saved! Website is LIVE for all users.'
-        : 'Settings saved! Website is in OFF / Coming Soon Mode.'
-    );
   };
 
   return (
