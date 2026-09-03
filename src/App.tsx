@@ -36,6 +36,8 @@ import { NotificationCenterModal } from './components/NotificationCenterModal';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { RailwayLogo } from './components/RailwayLogo';
 import { GoogleWorkspaceHub } from './components/GoogleWorkspaceHub';
+import { RRBAIAssistantModal } from './components/RRBAIAssistantModal';
+import { FloatingAIAvatar } from './components/FloatingAIAvatar';
 
 export default function App() {
   const [database, setDatabase] = useState<FullRRBDatabase>(loadRRBDatabase);
@@ -50,6 +52,15 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [firestoreStatus, setFirestoreStatus] = useState<FirestoreServiceStatus>(() => firestoreService.getStatus());
   const [dismissErrorBanner, setDismissErrorBanner] = useState(false);
+
+  // Sync dark mode class with root html element
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   // Real-time synchronization from Cloud Firestore
   useEffect(() => {
@@ -85,7 +96,6 @@ export default function App() {
   const handleDatabaseUpdate = (newDb: FullRRBDatabase) => {
     setDatabase(newDb);
     saveRRBDatabase(newDb);
-    firestoreService.saveFullDatabaseToFirestore(newDb).catch((e) => console.warn('Firestore database sync:', e));
   };
 
   // Support direct URL hash (#admin) or query parameter (?admin) for administrator access
@@ -184,6 +194,12 @@ export default function App() {
           currentTab={currentTab}
           setCurrentTab={handleNavigate}
           onOpenSearch={() => setIsSearchOpen(true)}
+          onOpenAIModal={() => setIsAIModalOpen(true)}
+        />
+        <FloatingAIAvatar onClick={() => setIsAIModalOpen(true)} />
+        <RRBAIAssistantModal
+          isOpen={isAIModalOpen}
+          onClose={() => setIsAIModalOpen(false)}
         />
       </div>
     );
@@ -225,6 +241,12 @@ export default function App() {
           currentTab={currentTab}
           setCurrentTab={handleNavigate}
           onOpenSearch={() => setIsSearchOpen(true)}
+          onOpenAIModal={() => setIsAIModalOpen(true)}
+        />
+        <FloatingAIAvatar onClick={() => setIsAIModalOpen(true)} />
+        <RRBAIAssistantModal
+          isOpen={isAIModalOpen}
+          onClose={() => setIsAIModalOpen(false)}
         />
       </div>
     );
@@ -388,6 +410,18 @@ export default function App() {
         currentTab={currentTab}
         setCurrentTab={handleNavigate}
         onOpenSearch={() => setIsSearchOpen(true)}
+        onOpenAIModal={() => setIsAIModalOpen(true)}
+      />
+
+      {/* Floating AI Railway Assistant Avatar (on public views) */}
+      {currentTab !== 'admin' && (
+        <FloatingAIAvatar onClick={() => setIsAIModalOpen(true)} />
+      )}
+
+      {/* RRB AI Assistant Chat Modal */}
+      <RRBAIAssistantModal
+        isOpen={isAIModalOpen}
+        onClose={() => setIsAIModalOpen(false)}
       />
 
       {/* Official Government of India / RRB Footer */}
@@ -509,13 +543,6 @@ export default function App() {
           </div>
         </div>
       </footer>
-
-      {/* Mobile Sticky Bottom Nav with AI button */}
-      <MobileBottomNav
-        currentTab={currentTab}
-        setCurrentTab={handleNavigate}
-        onOpenAIModal={() => setIsAIModalOpen(true)}
-      />
     </div>
   );
 }

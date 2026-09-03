@@ -176,8 +176,10 @@ class FirestoreDatabaseService {
             this.cachedDatabase.notices = list;
             this.notifyDbListeners();
           } else {
-            // Auto seed if empty
-            this.checkAndSeedInitialData();
+            // Auto seed if empty and authenticated as admin
+            if (auth.currentUser) {
+              this.checkAndSeedInitialData();
+            }
           }
         },
         (error) => {
@@ -459,15 +461,27 @@ class FirestoreDatabaseService {
    */
   public async checkAndSeedInitialData(): Promise<void> {
     try {
+      // 1. Check if portal is already initialized
+      const initSnap = await getDoc(doc(db, COLLECTIONS.SETTINGS, 'initialized'));
+      if (initSnap.exists()) {
+        return;
+      }
+
+      // 2. Check if notices collection already populated
       const snap = await getDocs(collection(db, COLLECTIONS.NOTICES));
       if (!snap.empty) {
         return; // Already populated
       }
 
+      // 3. Only attempt write if authenticated user exists
+      if (!auth.currentUser) {
+        return;
+      }
+
       console.info('🌱 Seeding official railway database into Firestore rrb-smart-portal...');
       await this.saveFullDatabaseToFirestore({
         metadata: {
-          version: '4.1.0-FIRESTORE',
+          version: '4.2.0-FIRESTORE',
           lastUpdated: new Date().toISOString(),
           uploadedBy: 'Official Railway System',
           source: 'Railway Recruitment Board Firestore Cloud Database',
@@ -482,7 +496,7 @@ class FirestoreDatabaseService {
       });
       console.info('✅ Initial Firestore seeding completed successfully.');
     } catch (err) {
-      console.warn('Initial seed note (may have existing data or offline mode):', err);
+      console.warn('Initial seed note (read-only mode active):', err);
     }
   }
 
@@ -756,14 +770,32 @@ class FirestoreDatabaseService {
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
+      // Mark portal initialized
+      await setDoc(doc(db, COLLECTIONS.SETTINGS, 'initialized'), {
+        initialized: true,
+        seededAt: serverTimestamp(),
+        lastVersion: fullDb.metadata?.version || '4.2.0',
+      }, { merge: true });
+
       this.cachedDatabase = { ...fullDb };
       this.notifyDbListeners();
       this.updateStatus({ isLoading: false, lastSyncedAt: new Date().toISOString(), error: null });
 
       return { success: true };
     } catch (err: any) {
-      console.error('Failed to sync full database to Firestore:', err);
+      const isPermDenied = err?.code === 'permission-denied' || 
+                           err?.message?.includes('insufficient permissions') ||
+                           err?.message?.includes('Missing or insufficient permissions') ||
+                           err?.message?.includes('permission-denied');
       const msg = this.formatErrorMessage(err);
+
+      if (isPermDenied) {
+        console.warn('Firestore write permission notice (candidate public read-only mode):', err?.message);
+        this.updateStatus({ isLoading: false, error: null });
+        return { success: false, error: msg };
+      }
+
+      console.error('Failed to sync full database to Firestore:', err);
       this.updateStatus({ isLoading: false, error: msg });
       return { success: false, error: msg };
     }

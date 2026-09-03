@@ -6,6 +6,7 @@ interface MobileBottomNavProps {
   currentTab: TabView;
   setCurrentTab: (tab: TabView) => void;
   onOpenSearch?: () => void;
+  onOpenAIModal?: () => void;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({

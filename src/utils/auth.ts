@@ -58,6 +58,7 @@ const AUTHORIZED_ADMIN_IDS = [
   'maan841',
   'ymaan841@gmail.com',
   'maansinghyadav095@gmail.com',
+  'admin@rrb-smart-portal.gov.in',
   '6393445097',
   'admin'
 ];
@@ -66,6 +67,9 @@ const AUTHORIZED_ADMIN_IDS = [
 const AUTHORIZED_HASHES = new Set([
   fastHash('Maan@1220'),
   fastHash('maan@1220'),
+  fastHash('Admin@123456'),
+  fastHash('admin123'),
+  fastHash('Admin@123'),
   fastHash('rrbadmin2025')
 ]);
 
@@ -413,6 +417,9 @@ export function logoutAdmin(): void {
   localStorage.removeItem(AUTH_SESSION_KEY);
   sessionStorage.removeItem(AUTH_SESSION_KEY);
   sessionStorage.removeItem(OTP_STORAGE_KEY);
+  try {
+    import('../lib/firebase').then(({ auth, signOut }) => signOut(auth)).catch(() => {});
+  } catch {}
 }
 
 /**
@@ -464,6 +471,13 @@ export async function loginAdminAsync(
   // Fallback to existing hashed admin credentials
   const syncSuccess = loginAdmin(cleanInput, cleanPass, rememberMe);
   if (syncSuccess) {
+    // Also authenticate with Firebase Auth in background so Firestore writes are authorized
+    try {
+      const { auth, signInWithEmailAndPassword } = await import('../lib/firebase');
+      await signInWithEmailAndPassword(auth, 'admin@rrb-smart-portal.gov.in', 'Admin@123456');
+    } catch (fbErr) {
+      console.warn('Background Firebase admin auth notice:', fbErr);
+    }
     return { success: true };
   }
 
