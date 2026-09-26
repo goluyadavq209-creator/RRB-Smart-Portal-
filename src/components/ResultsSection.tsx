@@ -66,6 +66,7 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
   const availableYears = useMemo(() => {
     const set = new Set<string>();
     set.add('All Years');
+    set.add('2026');
     set.add('2025');
     set.add('2024');
     set.add('2022');
@@ -75,6 +76,10 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
     database.results.forEach((r) => {
       if (r.publishDate) {
         const yr = r.publishDate.match(/\b(20\d\d)\b/);
+        if (yr) set.add(yr[1]);
+      }
+      if (r.cenNumber) {
+        const yr = r.cenNumber.match(/\b(20\d\d)\b/);
         if (yr) set.add(yr[1]);
       }
     });
@@ -166,14 +171,20 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
     return database.results.filter((res) => {
       const activeSearch = searchQuery.toLowerCase().trim();
 
-      // Search matching across multiple fields (CEN, Exam Title, Zone Name, Stage, Roll Numbers)
+      // Search matching across multiple fields (CEN, Exam Title, Zone Name, Stage, Roll Numbers, Candidates)
       const matchesSearch =
         !activeSearch ||
         res.examTitle.toLowerCase().includes(activeSearch) ||
         res.cenNumber.toLowerCase().includes(activeSearch) ||
         res.zoneName.toLowerCase().includes(activeSearch) ||
         res.stage.toLowerCase().includes(activeSearch) ||
-        (res.rollNumbersSample && res.rollNumbersSample.some((r) => r.toLowerCase().includes(activeSearch)));
+        Boolean(res.rollNumbersText && res.rollNumbersText.toLowerCase().includes(activeSearch)) ||
+        Boolean(res.rollNumbersSample && res.rollNumbersSample.some((r) => r.toLowerCase().includes(activeSearch))) ||
+        Boolean(res.candidateRecords && res.candidateRecords.some((c) => 
+          c.rollNumber.toLowerCase().includes(activeSearch) ||
+          c.name.toLowerCase().includes(activeSearch) ||
+          c.registrationNo.toLowerCase().includes(activeSearch)
+        ));
 
       // Exam Filter
       const matchesExam =
@@ -184,7 +195,9 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
       // Year Filter
       const matchesYear =
         selectedYear === 'All Years' ||
-        Boolean(res.publishDate && res.publishDate.includes(selectedYear));
+        Boolean(res.publishDate && res.publishDate.includes(selectedYear)) ||
+        Boolean(res.cenNumber && res.cenNumber.includes(selectedYear)) ||
+        Boolean(res.examTitle && res.examTitle.includes(selectedYear));
 
       // Stage Filter
       const matchesStage =

@@ -70,29 +70,26 @@ export const CutoffSection: React.FC<CutoffSectionProps> = ({
 }) => {
   // 1. Dynamic Extraction of Available Options from Database
   const availableExams = useMemo(() => {
-    const set = new Set<string>();
-    // Default standard list
-    set.add('NTPC (Graduate)');
-    set.add('NTPC (Under Graduate)');
-    set.add('ALP (Assistant Loco Pilot)');
-    set.add('Technician Gr I & III');
-    set.add('RRB Group D (Level-1)');
-    set.add('RRB JE (Junior Engineer)');
-    set.add('RPF SI & Constable');
-
-    // Add any from database.cutoffs
+    const list = [
+      'All Railway Posts (सभी पद)',
+      'ALP (Assistant Loco Pilot)',
+      'Technician Gr I & III',
+      'NTPC (Graduate)',
+      'NTPC (Under Graduate)',
+      'RRB JE (Junior Engineer)',
+      'RRB Group D (Level-1)',
+      'RPF SI & Constable',
+      'Paramedical Categories'
+    ];
     database.cutoffs.forEach((c) => {
-      if (c.examTitle) set.add(c.examTitle);
+      if (c.examTitle && !list.includes(c.examTitle)) list.push(c.examTitle);
     });
-    // Add any from database.exams
-    database.exams.forEach((e) => {
-      if (e.shortCode) set.add(e.shortCode);
-    });
-    return Array.from(set);
-  }, [database.cutoffs, database.exams]);
+    return list;
+  }, [database.cutoffs]);
 
   const availableYears = useMemo(() => {
     const set = new Set<string>();
+    set.add('2026');
     set.add('2025');
     set.add('2024');
     set.add('2022');
@@ -105,25 +102,27 @@ export const CutoffSection: React.FC<CutoffSectionProps> = ({
   }, [database.cutoffs]);
 
   const availableStages = useMemo(() => {
-    const set = new Set<string>();
-    set.add('CBT-1');
-    set.add('CBT-2 (Part-A)');
-    set.add('CBAT / Psycho');
-    set.add('Typing Skill Test');
-    set.add('Document Verification (DV)');
+    const list = [
+      'All Stages (सभी चरण)',
+      'CBT-1',
+      'CBT-2 (Part-A)',
+      'CBAT / Psycho',
+      'Document Verification (DV)',
+      'Final Merit'
+    ];
     database.cutoffs.forEach((c) => {
-      if (c.stage) set.add(c.stage);
+      if (c.stage && !list.includes(c.stage)) list.push(c.stage);
     });
-    return Array.from(set);
+    return list;
   }, [database.cutoffs]);
 
-  // 2. Filter State
-  const [selectedExam, setSelectedExam] = useState<string>('NTPC (Graduate)');
-  const [selectedYear, setSelectedYear] = useState<string>('2025');
-  const [selectedStage, setSelectedStage] = useState<string>('CBT-1');
+  // 2. Filter State - Default to 2026 and All Posts for immediate rich view
+  const [selectedExam, setSelectedExam] = useState<string>('All Railway Posts (सभी पद)');
+  const [selectedYear, setSelectedYear] = useState<string>('2026');
+  const [selectedStage, setSelectedStage] = useState<string>('All Stages (सभी चरण)');
   const [selectedCategory, setSelectedCategory] = useState<string>('All Categories');
   const [selectedZone, setSelectedZone] = useState<string>(
-    selectedZoneFilter && selectedZoneFilter !== 'ALL' ? selectedZoneFilter : 'GKP'
+    selectedZoneFilter && selectedZoneFilter !== 'ALL' ? selectedZoneFilter : 'ALL'
   );
 
   // 3. View Modes
@@ -139,13 +138,26 @@ export const CutoffSection: React.FC<CutoffSectionProps> = ({
   // 5. Dynamic Query Matching: Find exact CutoffRecord(s) for the selection
   const exactMatchingRecords = useMemo(() => {
     return database.cutoffs.filter((c) => {
-      const matchExam = selectedExam === 'ALL' || !selectedExam || 
+      const matchExam = 
+        selectedExam === 'ALL' || 
+        selectedExam === 'All Railway Posts (सभी पद)' || 
+        !selectedExam || 
         c.examTitle.toLowerCase().includes(selectedExam.toLowerCase()) ||
-        selectedExam.toLowerCase().includes(c.examTitle.toLowerCase());
+        selectedExam.toLowerCase().includes(c.examTitle.toLowerCase()) ||
+        (selectedExam.includes('ALP') && c.examTitle.includes('ALP')) ||
+        (selectedExam.includes('Technician') && c.examTitle.includes('Technician')) ||
+        (selectedExam.includes('NTPC (Graduate)') && c.examTitle.includes('Graduate')) ||
+        (selectedExam.includes('Under Graduate') && c.examTitle.includes('Under Graduate')) ||
+        (selectedExam.includes('Group D') && c.examTitle.includes('Group D')) ||
+        (selectedExam.includes('JE') && c.examTitle.includes('JE')) ||
+        (selectedExam.includes('RPF') && c.examTitle.includes('RPF'));
       
-      const matchYear = !selectedYear || String(c.year) === selectedYear;
+      const matchYear = !selectedYear || selectedYear === 'ALL' || String(c.year) === selectedYear;
       
-      const matchStage = !selectedStage || 
+      const matchStage = 
+        !selectedStage || 
+        selectedStage === 'ALL' || 
+        selectedStage === 'All Stages (सभी चरण)' ||
         c.stage.toLowerCase().includes(selectedStage.toLowerCase()) ||
         selectedStage.toLowerCase().includes(c.stage.toLowerCase());
 
@@ -432,6 +444,7 @@ export const CutoffSection: React.FC<CutoffSectionProps> = ({
                 }}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
               >
+                <option value="ALL">All 21 Regional RRBs (सभी 21 आरआरबी)</option>
                 {database.zones.map((zone) => (
                   <option key={zone.code} value={zone.code}>
                     {zone.name} ({zone.code})

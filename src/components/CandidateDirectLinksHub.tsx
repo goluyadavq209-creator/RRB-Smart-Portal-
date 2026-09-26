@@ -11,7 +11,10 @@ import {
   Sparkles, 
   ShieldCheck,
   ArrowRight,
-  Filter
+  Filter,
+  Globe,
+  Search,
+  Building2
 } from 'lucide-react';
 import { CandidatePortalLink, FullRRBDatabase, PortalLinkType, TabView } from '../types';
 
@@ -25,14 +28,25 @@ export const CandidateDirectLinksHub: React.FC<CandidateDirectLinksHubProps> = (
   setCurrentTab,
 }) => {
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<'all' | PortalLinkType>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const links = Array.isArray(database?.portalLinks) ? database.portalLinks : [];
   const activeLinks = links.filter((l) => l && l.isActive);
 
-  const filteredLinks = selectedTypeFilter === 'all'
-    ? activeLinks
-    : activeLinks.filter((l) => l && l.type === selectedTypeFilter);
+  const filteredLinks = activeLinks.filter((l) => {
+    if (!l) return false;
+    const matchesType = selectedTypeFilter === 'all' || l.type === selectedTypeFilter;
+    if (!matchesType) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      (l.title && l.title.toLowerCase().includes(q)) ||
+      (l.examName && l.examName.toLowerCase().includes(q)) ||
+      (l.cenNumber && l.cenNumber.toLowerCase().includes(q)) ||
+      (l.notes && l.notes.toLowerCase().includes(q))
+    );
+  });
 
   const handleCopy = (id: string, url: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -78,6 +92,17 @@ export const CandidateDirectLinksHub: React.FC<CandidateDirectLinksHubProps> = (
           iconBg: 'bg-amber-600 text-white',
           Icon: Award,
         };
+      case 'other':
+        return {
+          label: 'Govt Portal',
+          bgLight: 'bg-indigo-50/80',
+          borderColor: 'border-indigo-200 hover:border-indigo-400',
+          textColor: 'text-indigo-700',
+          badgeBg: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+          btnBg: 'bg-indigo-700 hover:bg-indigo-800 text-white',
+          iconBg: 'bg-indigo-700 text-white',
+          Icon: Globe,
+        };
       case 'city_intimation':
       default:
         return {
@@ -99,6 +124,7 @@ export const CandidateDirectLinksHub: React.FC<CandidateDirectLinksHubProps> = (
     answer_key: activeLinks.filter((l) => l.type === 'answer_key').length,
     score_card: activeLinks.filter((l) => l.type === 'score_card').length,
     city_intimation: activeLinks.filter((l) => l.type === 'city_intimation').length,
+    other: activeLinks.filter((l) => l.type === 'other').length,
   };
 
   return (
@@ -110,16 +136,16 @@ export const CandidateDirectLinksHub: React.FC<CandidateDirectLinksHubProps> = (
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
         <div>
           <div className="flex items-center space-x-2">
-            <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-md bg-red-100 text-[#c1121f] text-[11px] font-bold uppercase tracking-wider border border-red-200">
-              <span className="w-2 h-2 rounded-full bg-[#c1121f] animate-pulse"></span>
-              <span>Live Portals</span>
+            <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[11px] font-bold uppercase tracking-wider border border-emerald-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+              <span>Direct Links Hub</span>
             </span>
-            <h2 className="text-base sm:text-lg font-black text-slate-900">
-              Candidate Direct Portals & Links
+            <h2 className="text-base sm:text-xl font-black text-slate-900">
+              Railway Candidate Direct Portals & Links (2024–2026)
             </h2>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Direct online login links for Answer Key, Admit Card (E-Call Letter), Score Card & Exam City Slip
+          <p className="text-xs sm:text-sm text-slate-600 mt-1">
+            आधिकारिक लॉगिन लिंक्स: Admit Card (E-Call Letter), City Slip, Score Card, Answer Key & Objection Tracker
           </p>
         </div>
 
@@ -135,81 +161,101 @@ export const CandidateDirectLinksHub: React.FC<CandidateDirectLinksHubProps> = (
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-thin">
-        <button
-          onClick={() => setSelectedTypeFilter('all')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center space-x-1.5 ${
-            selectedTypeFilter === 'all'
-              ? 'bg-slate-900 text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <span>All Direct Links</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-200">
-            {countByType.all}
-          </span>
-        </button>
+      {/* Search and Filter Row */}
+      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        {/* Search input */}
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search links by post (e.g. ALP, NTPC, Technician, JE, Group D, RPF)..."
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#c1121f] focus:bg-white"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 p-1"
+            >
+              ✕
+            </button>
+          )}
+        </div>
 
-        <button
-          onClick={() => setSelectedTypeFilter('admit_card')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center space-x-1.5 ${
-            selectedTypeFilter === 'admit_card'
-              ? 'bg-[#c1121f] text-white shadow-xs'
-              : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200/60'
-          }`}
-        >
-          <Ticket className="w-3.5 h-3.5" />
-          <span>Admit Card</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-200/80 text-rose-900">
-            {countByType.admit_card}
-          </span>
-        </button>
+        {/* Filter Tabs */}
+        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-thin shrink-0">
+          <button
+            onClick={() => setSelectedTypeFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center space-x-1.5 ${
+              selectedTypeFilter === 'all'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <span>All ({countByType.all})</span>
+          </button>
 
-        <button
-          onClick={() => setSelectedTypeFilter('answer_key')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center space-x-1.5 ${
-            selectedTypeFilter === 'answer_key'
-              ? 'bg-teal-700 text-white shadow-xs'
-              : 'bg-teal-50 text-teal-800 hover:bg-teal-100 border border-teal-200/60'
-          }`}
-        >
-          <FileSpreadsheet className="w-3.5 h-3.5" />
-          <span>Answer Key</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-teal-200/80 text-teal-900">
-            {countByType.answer_key}
-          </span>
-        </button>
+          <button
+            onClick={() => setSelectedTypeFilter('admit_card')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center space-x-1.5 ${
+              selectedTypeFilter === 'admit_card'
+                ? 'bg-[#c1121f] text-white shadow-xs'
+                : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200/60'
+            }`}
+          >
+            <Ticket className="w-3.5 h-3.5" />
+            <span>Admit Card ({countByType.admit_card})</span>
+          </button>
 
-        <button
-          onClick={() => setSelectedTypeFilter('score_card')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center space-x-1.5 ${
-            selectedTypeFilter === 'score_card'
-              ? 'bg-amber-600 text-white shadow-xs'
-              : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200/60'
-          }`}
-        >
-          <Award className="w-3.5 h-3.5" />
-          <span>Score Card</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-200/80 text-amber-950">
-            {countByType.score_card}
-          </span>
-        </button>
+          <button
+            onClick={() => setSelectedTypeFilter('city_intimation')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center space-x-1.5 ${
+              selectedTypeFilter === 'city_intimation'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200/60'
+            }`}
+          >
+            <MapPin className="w-3.5 h-3.5" />
+            <span>City Slip ({countByType.city_intimation})</span>
+          </button>
 
-        <button
-          onClick={() => setSelectedTypeFilter('city_intimation')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center space-x-1.5 ${
-            selectedTypeFilter === 'city_intimation'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200/60'
-          }`}
-        >
-          <MapPin className="w-3.5 h-3.5" />
-          <span>City Slip</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-200/80 text-blue-900">
-            {countByType.city_intimation}
-          </span>
-        </button>
+          <button
+            onClick={() => setSelectedTypeFilter('score_card')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center space-x-1.5 ${
+              selectedTypeFilter === 'score_card'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200/60'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5" />
+            <span>Score Card ({countByType.score_card})</span>
+          </button>
+
+          <button
+            onClick={() => setSelectedTypeFilter('answer_key')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center space-x-1.5 ${
+              selectedTypeFilter === 'answer_key'
+                ? 'bg-teal-700 text-white shadow-xs'
+                : 'bg-teal-50 text-teal-800 hover:bg-teal-100 border border-teal-200/60'
+            }`}
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Answer Key ({countByType.answer_key})</span>
+          </button>
+
+          <button
+            onClick={() => setSelectedTypeFilter('other')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center space-x-1.5 ${
+              selectedTypeFilter === 'other'
+                ? 'bg-indigo-700 text-white shadow-xs'
+                : 'bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-200/60'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>Govt Portals ({countByType.other})</span>
+          </button>
+        </div>
       </div>
 
       {/* Links Grid */}

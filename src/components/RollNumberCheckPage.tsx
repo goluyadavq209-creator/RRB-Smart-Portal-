@@ -399,6 +399,40 @@ export const RollNumberCheckPage: React.FC<RollNumberCheckPageProps> = ({
                   </button>
                 </form>
 
+                {/* Quick Sample Roll Numbers for 2026, 2025, 2024 */}
+                <div className="pt-1 border-t border-slate-100">
+                  <div className="text-[11px] font-bold text-slate-500 mb-2 flex items-center justify-between">
+                    <span>Try 2024-2026 Roll Numbers:</span>
+                    <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-semibold">Click to test</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { label: 'ALP 2026', roll: '11260001001' },
+                      { label: 'Tech 2026', roll: '22260002001' },
+                      { label: 'NTPC 2026', roll: '55260005001' },
+                      { label: 'JE 2026', roll: '33260003001' },
+                      { label: 'Group D 2026', roll: '88260008001' },
+                      { label: 'RPF 2026', roll: '99260009001' },
+                      { label: 'ALP 2025', roll: '11250001001' },
+                      { label: 'Tech 2025', roll: '22250002001' },
+                      { label: 'NTPC 2024', roll: '11210001001' },
+                      { label: 'Group D 2024', roll: '11220001001' },
+                    ].map((item) => (
+                      <button
+                        key={item.roll}
+                        type="button"
+                        onClick={() => {
+                          setRollInput(item.roll);
+                          handleVerify(item.roll);
+                        }}
+                        className="px-2 py-1 text-[10px] font-bold bg-slate-100 hover:bg-blue-100 hover:text-blue-700 text-slate-700 rounded-lg transition-colors cursor-pointer"
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Footer Safe Message */}
                 <div className="pt-2 flex items-center justify-center space-x-1.5 text-xs text-slate-600 font-medium">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />

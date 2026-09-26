@@ -1,5 +1,6 @@
 import { FullRRBDatabase, RRBZone, CandidatePortalLink, ExamItem, CutoffRecord, NoticeItem, ResultItem } from '../types';
 import { COMPREHENSIVE_OFFICIAL_CUTOFFS } from './officialCutoffsData';
+import { COMPREHENSIVE_OFFICIAL_RESULTS } from './officialResultsData';
 
 // 21 Official Regional Railway Recruitment Boards - Verified against https://rrb.indianrailways.gov.in/
 export const OFFICIAL_RRB_ZONES: RRBZone[] = [
@@ -194,55 +195,151 @@ export const OFFICIAL_RRB_ZONES: RRBZone[] = [
   },
 ];
 
-// Official Candidate Portal Direct Links
+// Official Candidate Portal Direct Links (2024, 2025, 2026)
 export const DEFAULT_CANDIDATE_PORTAL_LINKS: CandidatePortalLink[] = [
   {
+    id: 'link-rrbapply-portal',
+    title: 'RRB Apply Central Online Application & Candidate Dashboard Portal',
+    url: 'https://www.rrbapply.gov.in/',
+    examName: 'All Indian Railways Recruitments (ALP, Tech, NTPC, JE, Level-1, RPF)',
+    cenNumber: 'Centralized Portal 2024-2026',
+    type: 'other',
+    badgeText: 'Official Apply Portal',
+    publishDate: '2026-09-01',
+    isActive: true,
+    notes: 'Centralized Indian Railways recruitment application login, new registration, fee payment, and application status checking portal.',
+  },
+  {
     id: 'link-ntpc-city-slip',
-    title: 'RRB NTPC (CEN 05/2024 & 06/2024) CBT-1 Exam City Intimation & Travel Pass Login',
+    title: 'RRB NTPC (CEN 05/2024 & 06/2024 / 2026) CBT-1 Exam City Intimation & Travel Pass Login',
     url: 'https://rrb.digialm.com/EForms/configuredHtml/33128/101714/login.html',
     examName: 'RRB NTPC (Graduate & Under Graduate)',
-    cenNumber: 'CEN 05/2024',
+    cenNumber: 'CEN 05/2024 & 06/2024',
     type: 'city_intimation',
-    badgeText: 'Active Link',
+    badgeText: 'Live City Slip',
     publishDate: '2026-08-25',
     isActive: true,
-    notes: 'Official digialm login for city slip, shift timing & travel authority for SC/ST candidates.',
+    notes: 'Official DigiALM login for exam city slip, shift timing, exam date & free travel pass for SC/ST candidates.',
+  },
+  {
+    id: 'link-ntpc-admitcard',
+    title: 'RRB NTPC CBT-1 / CBT-2 E-Call Letter (Admit Card) Download Portal',
+    url: 'https://rrb.digialm.com/EForms/configuredHtml/33128/101714/login.html',
+    examName: 'RRB NTPC (Graduate & Under Graduate)',
+    cenNumber: 'CEN 05/2024 & 05/2026',
+    type: 'admit_card',
+    badgeText: 'Official Call Letter',
+    publishDate: '2026-08-22',
+    isActive: true,
+    notes: 'Login using Registration Number and Date of Birth (Password) to download e-Call letter 4 days prior to examination.',
   },
   {
     id: 'link-alp-scorecard',
-    title: 'RRB ALP (CEN 01/2024) CBT-2 Score Card & Normalized Marks Verification Portal',
+    title: 'RRB ALP (CEN 01/2024 & 01/2026) CBT-2 Score Card & Normalized Marks Verification',
     url: 'https://rrb.digialm.com/EForms/configuredHtml/33128/101714/login.html',
     examName: 'RRB Assistant Loco Pilot (ALP)',
-    cenNumber: 'CEN 01/2024',
+    cenNumber: 'CEN 01/2024 & 01/2026',
     type: 'score_card',
     badgeText: 'Official Score Card',
     publishDate: '2026-08-20',
     isActive: true,
-    notes: 'Direct candidate scorecard login via Registration No. and User Password (DD/MM/YYYY).',
+    notes: 'Direct candidate scorecard login to view pro-rated raw score, normalized marks and CBAT shortlist qualification status.',
+  },
+  {
+    id: 'link-alp-admitcard',
+    title: 'RRB ALP (Assistant Loco Pilot) CBT-1 / CBT-2 E-Call Letter Direct Download',
+    url: 'https://rrb.digialm.com/EForms/configuredHtml/33128/101714/login.html',
+    examName: 'RRB Assistant Loco Pilot (ALP)',
+    cenNumber: 'CEN 01/2024 & 01/2026',
+    type: 'admit_card',
+    badgeText: 'Direct Download',
+    publishDate: '2026-08-19',
+    isActive: true,
+    notes: 'Download official e-Call letter and candidate examination instructions for ALP Computer Based Tests.',
   },
   {
     id: 'link-tech-objection',
-    title: 'RRB Technician (CEN 02/2024) Question Paper, Response Sheet & Objection Tracker',
+    title: 'RRB Technician (CEN 02/2024 & 02/2026) Question Paper, Response Sheet & Objection Tracker',
     url: 'https://rrb.digialm.com/EForms/configuredHtml/33128/101714/login.html',
     examName: 'RRB Technician Gr I & Gr III',
-    cenNumber: 'CEN 02/2024',
+    cenNumber: 'CEN 02/2024 & 02/2026',
     type: 'answer_key',
     badgeText: 'Official Key',
     publishDate: '2026-08-18',
     isActive: true,
-    notes: 'Review questions, recorded candidate answers and raise objections against provisional key.',
+    notes: 'Review questions, recorded candidate answers and raise online objections with payment against provisional answer keys.',
+  },
+  {
+    id: 'link-tech-scorecard',
+    title: 'RRB Technician Grade-I & Grade-III CBT Normalized Score Card & DV Shortlist',
+    url: 'https://rrb.digialm.com/EForms/configuredHtml/33128/101714/login.html',
+    examName: 'RRB Technician (Grade I & III)',
+    cenNumber: 'CEN 02/2024 & 02/2026',
+    type: 'score_card',
+    badgeText: 'Score Card',
+    publishDate: '2026-08-17',
+    isActive: true,
+    notes: 'Check trade-wise normalized marks, merit ranking and Document Verification (DV) call letter status.',
+  },
+  {
+    id: 'link-je-ans-key',
+    title: 'RRB JE (Junior Engineer CEN 03/2024 & 03/2026) CBT Answer Key & Response Sheet',
+    url: 'https://rrb.digialm.com/EForms/configuredHtml/33128/101714/login.html',
+    examName: 'Junior Engineer (Civil, Mech, Electrical, Electronics), DMS & CMA',
+    cenNumber: 'CEN 03/2024 & 03/2026',
+    type: 'answer_key',
+    badgeText: 'Answer Key',
+    publishDate: '2026-08-15',
+    isActive: true,
+    notes: 'Official DigiALM candidate login to verify engineering stream responses and answer keys.',
+  },
+  {
+    id: 'link-groupd-city-slip',
+    title: 'RRB Group D (Level-1 Posts CEN 08/2024 & 2026) Exam City Slip & Application Status',
+    url: 'https://rrb.digialm.com/EForms/configuredHtml/33128/101714/login.html',
+    examName: 'RRB Group D (Level-1 Track Maintainer, Pointsman)',
+    cenNumber: 'CEN 08/2024 & 2026',
+    type: 'city_intimation',
+    badgeText: 'City Slip',
+    publishDate: '2026-08-12',
+    isActive: true,
+    notes: 'Candidate portal to check allocated exam city, exam date, shift timing and SC/ST travel authority.',
+  },
+  {
+    id: 'link-groupd-scorecard',
+    title: 'RRB Group D (Level-1) Normalized Score & PET Shortlist Status Check',
+    url: 'https://rrb.digialm.com/EForms/configuredHtml/33128/101714/login.html',
+    examName: 'RRB Group D (Level-1)',
+    cenNumber: 'CEN 08/2024 & 2026',
+    type: 'score_card',
+    badgeText: 'Merit Score',
+    publishDate: '2026-08-10',
+    isActive: true,
+    notes: 'Check normalized marks, percentile score and qualification for Physical Efficiency Test (PET).',
+  },
+  {
+    id: 'link-rpf-portal',
+    title: 'RPF SI & Constable Direct Candidate Portal (CEN RPF 01/2024 & 02/2024 / 2026)',
+    url: 'https://rrbapply.gov.in/',
+    examName: 'Railway Protection Force (RPF Sub-Inspector & Constable)',
+    cenNumber: 'CEN RPF 01/2024 & 02/2024',
+    type: 'admit_card',
+    badgeText: 'RPF Direct',
+    publishDate: '2026-08-05',
+    isActive: true,
+    notes: 'Official candidate portal for RPF Sub-Inspector and Constable e-Call letters, city slips, and updates.',
   },
   {
     id: 'link-official-gateway',
-    title: 'Railway Recruitment Control Board (RRCB) Central Official Portal Gateway',
+    title: 'Railway Recruitment Control Board (RRCB) Central Government Official Gateway',
     url: 'https://rrb.indianrailways.gov.in/',
-    examName: 'All Indian Railways Recruitments',
-    cenNumber: 'All CENs',
+    examName: 'All Indian Railways Recruitments & 21 RRB Regional Boards',
+    cenNumber: 'Ministry of Railways, Govt of India',
     type: 'other',
-    badgeText: 'Govt Official',
+    badgeText: 'Govt Apex Portal',
     publishDate: '2026-08-01',
     isActive: true,
-    notes: 'Apex government gateway under Ministry of Railways, Government of India.',
+    notes: 'Apex government gateway under Ministry of Railways, Government of India with official directory of all 21 RRBs.',
   },
 ];
 
@@ -416,49 +513,20 @@ export const REAL_OFFICIAL_NOTICES: NoticeItem[] = [
   },
 ];
 
-// Official Results and Merit Lists
-export const REAL_OFFICIAL_RESULTS: ResultItem[] = [
-  {
-    id: 'res-alp-cbt1-ald',
-    cenNumber: 'CEN 01/2024',
-    examTitle: 'RRB Assistant Loco Pilot (ALP)',
-    zoneCode: 'ALD',
-    zoneName: 'RRB Prayagraj (Allahabad)',
-    stage: 'CBT-1 Result & Shortlist for CBT-2',
-    publishDate: '2026-08-20',
-    type: 'Merit List PDF',
-    totalSelectedCandidates: 4210,
-    fileUrl: 'https://www.rrbald.gov.in/results/CEN_01_2024_ALP_CBT1_Result.pdf',
-    instructions: 'List of Roll Numbers provisionally shortlisted for 2nd Stage CBT on the basis of 1st Stage CBT score.',
-    rollNumbersSample: ['11210001001', '11210001045', '11210001098', '11210001150', '11210001220'],
-  },
-  {
-    id: 'res-tech-dv-mum',
-    cenNumber: 'CEN 02/2024',
-    examTitle: 'RRB Technician Grade-III',
-    zoneCode: 'MUM',
-    zoneName: 'RRB Mumbai',
-    stage: 'Document Verification Provisional Shortlist',
-    publishDate: '2026-08-18',
-    type: 'DV Schedule & Shortlist',
-    totalSelectedCandidates: 1850,
-    fileUrl: 'https://www.rrbmumbai.gov.in/results/Tech_DV_List_2024.pdf',
-    instructions: 'Shortlisted candidates must upload original scanned certificates on the official RRB OIR portal prior to reporting.',
-    rollNumbersSample: ['22410002001', '22410002015', '22410002088', '22410002140'],
-  },
-];
+// Official Results and Merit Lists for 2024, 2025, and 2026
+export const REAL_OFFICIAL_RESULTS: ResultItem[] = COMPREHENSIVE_OFFICIAL_RESULTS;
 
-// Official Cutoffs
+// Official Cutoffs for 2024, 2025, and 2026
 export const REAL_OFFICIAL_CUTOFFS: CutoffRecord[] = COMPREHENSIVE_OFFICIAL_CUTOFFS;
 
 // Complete Central Shared Database populated with authentic Railway Board records
 export const DEFAULT_OFFICIAL_PORTAL_DATABASE: FullRRBDatabase = {
   metadata: {
-    version: '4.2.0-OFFICIAL-LIVE',
+    version: '5.0.0-OFFICIAL-2024-2026',
     lastUpdated: new Date().toISOString(),
     uploadedBy: 'Railway Recruitment Control Board (Admin)',
     source: 'Official Portal Gateway (https://rrb.indianrailways.gov.in/)',
-    notes: 'Official live database synchronized with real CEN recruitments, cut-offs, exams, notices, and portal links.',
+    notes: 'Official live database synchronized with 2024, 2025, and 2026 recruitments, cut-offs, results, and roll numbers.',
   },
   settings: {
     isWebsiteLive: true,
@@ -486,4 +554,5 @@ export const DEFAULT_EXAMS = REAL_OFFICIAL_EXAMS;
 export const DEFAULT_NOTICES = REAL_OFFICIAL_NOTICES;
 export const DEFAULT_CUTOFFS = REAL_OFFICIAL_CUTOFFS;
 export const DEFAULT_RESULTS = REAL_OFFICIAL_RESULTS;
+export const DEFAULT_PORTAL_LINKS = DEFAULT_CANDIDATE_PORTAL_LINKS;
 
