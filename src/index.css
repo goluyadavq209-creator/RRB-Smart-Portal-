@@ -1,1 +1,8 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  * {
+    border-color: var(--border, rgba(255, 255, 255, 0.1));
+  }
+}
