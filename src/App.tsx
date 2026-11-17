@@ -1,518 +1,626 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  ShoppingBag, 
-  Briefcase, 
-  GraduationCap, 
-  LayoutDashboard, 
-  User, 
-  Code2, 
-  ArrowRight, 
-  Check, 
-  Sun, 
-  Moon, 
-  Send, 
-  Layers, 
-  Palette, 
-  CheckCircle2, 
-  Copy,
-  Sparkles,
-  Smartphone,
-  ExternalLink,
-  RefreshCw
+import React, { useEffect, useState } from 'react';
+import {
+  BookOpen,
+  LayoutDashboard,
+  Table2,
+  UserPlus,
+  BellRing,
+  CreditCard,
+  FileBarChart,
+  Workflow,
+  Sun,
+  Moon,
+  LogIn,
+  LogOut,
+  Menu,
+  X,
+  AlertCircle,
 } from 'lucide-react';
+import {
+  auth,
+  googleSignIn,
+  logoutGoogle,
+  onAuthStateChanged,
+  User,
+} from './lib/firebase';
+import {
+  AppView,
+  LibraryConfig,
+  LibraryMember,
+  PaymentMode,
+  PaymentRecord,
+  ReminderLog,
+} from './types/library';
+import {
+  buildSampleMembers,
+  buildSamplePayments,
+  buildSampleReminders,
+} from './data/libraryGuideData';
+import {
+  buildWhatsAppReminderText,
+  computeDaysLeft,
+  computeNextExpiryAfterPayment,
+  getTodayKolkataIso,
+} from './utils/libraryLogic';
+import {
+  deleteMemberFromFirestore,
+  ensureOwnerWorkspace,
+  recordPaymentBatchInFirestore,
+  recordRemindersBatchInFirestore,
+  saveConfigToFirestore,
+  saveMemberToFirestore,
+  subscribeOwnerConfig,
+  subscribeOwnerMembers,
+  subscribeOwnerPayments,
+  subscribeOwnerReminders,
+} from './services/libraryFirestore';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { DashboardView } from './components/DashboardView';
+import { MembersSheetView } from './components/MembersSheetView';
+import { MemberEntryView } from './components/MemberEntryView';
+import { RemindersView } from './components/RemindersView';
+import { PaymentsView } from './components/PaymentsView';
+import { DailyReportView } from './components/DailyReportView';
+import { AutomationGuideView } from './components/AutomationGuideView';
 
-interface ProjectTemplate {
-  id: string;
-  title: string;
-  hindiTitle: string;
-  category: string;
-  description: string;
-  features: string[];
-  recommendedPages: string[];
-  accentColor: string;
-}
-
-const TEMPLATES: ProjectTemplate[] = [
-  {
-    id: 'ecommerce',
-    title: 'E-Commerce & Online Store',
-    hindiTitle: 'ऑनलाइन शॉपिंग स्टोर',
-    category: 'Retail & Store',
-    description: 'Modern product catalog with category filters, shopping cart, checkout flow, customer reviews, and order tracking.',
-    features: ['Product Catalog & Search', 'Cart & Instant Checkout', 'Filter by Price & Category', 'Customer Reviews & Ratings'],
-    recommendedPages: ['Home', 'Shop / Catalog', 'Product Details', 'Cart & Checkout', 'Contact & Support'],
-    accentColor: 'from-amber-500 to-orange-500'
-  },
-  {
-    id: 'business',
-    title: 'Agency & Business Website',
-    hindiTitle: 'कंपनी एवं व्यापारिक वेबसाइट',
-    category: 'Corporate & Services',
-    description: 'High-converting business presence with hero banner, service offerings, case studies, team profiles, and inquiry forms.',
-    features: ['Service Breakdown Cards', 'Interactive Case Studies', 'Client Testimonials', 'Lead Capture & WhatsApp Contact'],
-    recommendedPages: ['Home', 'About Us', 'Services', 'Portfolio / Work', 'Contact Us'],
-    accentColor: 'from-blue-500 to-indigo-600'
-  },
-  {
-    id: 'coaching',
-    title: 'Coaching & Education Portal',
-    hindiTitle: 'कोचिंग एवं शिक्षण संस्थान',
-    category: 'EdTech & Learning',
-    description: 'Comprehensive educational platform with course listings, online registration, quiz/test portal, notices, and study material.',
-    features: ['Course & Batch Catalog', 'Student Enrollment Form', 'Study Materials / Notes', 'Interactive Quiz & Test Module'],
-    recommendedPages: ['Home', 'Courses & Fees', 'Online Test / Quiz', 'Study Material', 'Admissions'],
-    accentColor: 'from-emerald-500 to-teal-600'
-  },
-  {
-    id: 'saas',
-    title: 'SaaS Tool & Admin Dashboard',
-    hindiTitle: 'डैशबोर्ड एवं वेब सॉफ्टवेयर',
-    category: 'Software & Data',
-    description: 'Production-ready dashboard layout with metric KPIs, real-time data tables, chart analytics, user settings, and permissions.',
-    features: ['Interactive Analytics Cards', 'Sortable & Searchable Data Table', 'Dark / Light Mode Workspace', 'User Profile & Settings'],
-    recommendedPages: ['Overview', 'Analytics', 'Data Records', 'Reports', 'Settings'],
-    accentColor: 'from-violet-500 to-purple-600'
-  },
-  {
-    id: 'portfolio',
-    title: 'Personal Portfolio & Brand',
-    hindiTitle: 'पर्सनल पोर्टफोलियो एवं प्रोफाइल',
-    category: 'Personal & Creative',
-    description: 'Sleek personal portfolio highlighting skills, featured projects, biography, resume download, and direct hire contact.',
-    features: ['Interactive Project Showcase', 'Skill Badges & Experience Timeline', 'Resume / CV Download', 'Direct Inquiry Form'],
-    recommendedPages: ['Hero / Bio', 'Featured Projects', 'Skills & Stack', 'Experience', 'Contact Me'],
-    accentColor: 'from-rose-500 to-pink-600'
-  },
-  {
-    id: 'custom',
-    title: 'Custom Web Application',
-    hindiTitle: 'कस्टम वेब ऐप (अपनी पसंद का)',
-    category: 'Custom Architecture',
-    description: 'Build any custom idea: directory, blog, community hub, real estate portal, booking platform, or specialized tool.',
-    features: ['Tailored to Your Exact Prompt', 'Interactive Client-Side Logic', 'Responsive Mobile & Desktop Design', 'Clean Modular Code'],
-    recommendedPages: ['Custom Structure defined by your prompt'],
-    accentColor: 'from-cyan-500 to-blue-500'
-  }
+const NAV_ITEMS: Array<{
+  id: AppView;
+  label: string;
+  breadcrumb: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { id: 'dashboard', label: '01. Dashboard', breadcrumb: 'Dashboard', icon: LayoutDashboard },
+  { id: 'members', label: '02. Members Sheet', breadcrumb: 'Members Sheet', icon: Table2 },
+  { id: 'entry', label: '03. Member Entry', breadcrumb: 'Member Entry', icon: UserPlus },
+  { id: 'reminders', label: '04. Expiry Reminders', breadcrumb: 'Expiry Reminders', icon: BellRing },
+  { id: 'payments', label: '05. Payment Update', breadcrumb: 'Payment Update', icon: CreditCard },
+  { id: 'report', label: '06. Daily Report', breadcrumb: 'Daily Report', icon: FileBarChart },
+  { id: 'guide', label: '07. n8n Setup Guide', breadcrumb: 'n8n Setup Guide', icon: Workflow },
 ];
 
-export default function App() {
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('ecommerce');
-  const [siteName, setSiteName] = useState<string>('My New Site');
-  const [siteTagline, setSiteTagline] = useState<string>('Welcome to our brand new web experience');
-  const [userPrompt, setUserPrompt] = useState<string>('');
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
-  const [copiedNotification, setCopiedNotification] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'builder' | 'preview'>('overview');
+const DEFAULT_CONFIG: LibraryConfig = {
+  ownerId: 'local-preview',
+  libraryName: 'My Study Library',
+  ownerEmail: '',
+  ownerPhone: '',
+  totalSeats: 80,
+  completedSteps: [],
+};
 
-  // Sync theme
+function LibraryDeskWorkspace() {
+  const [activeView, setActiveView] = useState<AppView>('dashboard');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isDark, setIsDark] = useState(false);
+
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const [members, setMembers] = useState<LibraryMember[]>(() =>
+    buildSampleMembers('local-preview')
+  );
+  const [payments, setPayments] = useState<PaymentRecord[]>(() =>
+    buildSamplePayments('local-preview')
+  );
+  const [reminders, setReminders] = useState<ReminderLog[]>(() =>
+    buildSampleReminders()
+  );
+  const [config, setConfig] = useState<LibraryConfig>(DEFAULT_CONFIG);
+
+  // Sync Tailwind dark mode class
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
+    const root = document.documentElement;
+    if (isDark) {
+      root.classList.add('dark');
     } else {
-      document.documentElement.classList.remove('dark');
+      root.classList.remove('dark');
     }
-  }, [isDarkMode]);
+  }, [isDark]);
 
-  const currentTemplate = TEMPLATES.find((t) => t.id === selectedTemplate) || TEMPLATES[0];
+  // Listen to Firebase Auth state & attach Firestore subscriptions only when signed in
+  useEffect(() => {
+    let unsubMembers: (() => void) | undefined;
+    let unsubPayments: (() => void) | undefined;
+    let unsubReminders: (() => void) | undefined;
+    let unsubConfig: (() => void) | undefined;
+    let cancelled = false;
 
-  const handleCopyPrompt = () => {
-    const textToCopy = `Create a ${currentTemplate.title} named "${siteName}". Tagline: "${siteTagline}". ${userPrompt ? `Requirements: ${userPrompt}` : ''}`;
-    navigator.clipboard.writeText(textToCopy);
-    setCopiedNotification(true);
-    setTimeout(() => setCopiedNotification(false), 3000);
+    const cleanupSubs = () => {
+      unsubMembers?.();
+      unsubPayments?.();
+      unsubReminders?.();
+      unsubConfig?.();
+      unsubMembers = undefined;
+      unsubPayments = undefined;
+      unsubReminders = undefined;
+      unsubConfig = undefined;
+    };
+
+    const unsubAuth = onAuthStateChanged(auth, async (nextUser) => {
+      cleanupSubs();
+      setAuthError(null);
+      setActionError(null);
+
+      if (!nextUser) {
+        setUser(null);
+        setMembers(buildSampleMembers('local-preview'));
+        setPayments(buildSamplePayments('local-preview'));
+        setReminders(buildSampleReminders());
+        setConfig(DEFAULT_CONFIG);
+        setIsDataLoading(false);
+        setAuthReady(true);
+        return;
+      }
+
+      if (!nextUser.emailVerified) {
+        setUser(nextUser);
+        setAuthError('Please verify your Google account email to enable Cloud Firestore sync.');
+        setIsDataLoading(false);
+        setAuthReady(true);
+        return;
+      }
+
+      setUser(nextUser);
+      setIsDataLoading(true);
+      try {
+        await ensureOwnerWorkspace(nextUser);
+        if (cancelled) return;
+
+        unsubMembers = subscribeOwnerMembers(nextUser.uid, (list) => {
+          setMembers(list);
+          setIsDataLoading(false);
+        });
+        unsubPayments = subscribeOwnerPayments(nextUser.uid, (list) => {
+          setPayments(list);
+        });
+        unsubReminders = subscribeOwnerReminders(nextUser.uid, (list) => {
+          setReminders(list);
+        });
+        unsubConfig = subscribeOwnerConfig(nextUser.uid, (cfg) => {
+          setConfig(cfg);
+        });
+      } catch (err) {
+        setIsDataLoading(false);
+        setActionError(err instanceof Error ? err.message : 'Could not load cloud workspace.');
+      } finally {
+        if (!cancelled) setAuthReady(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      cleanupSubs();
+      unsubAuth();
+    };
+  }, []);
+
+  const handleSignIn = async () => {
+    setAuthError(null);
+    try {
+      await googleSignIn();
+    } catch (err) {
+      setAuthError(
+        err instanceof Error ? err.message : 'Google Sign-In was cancelled or failed.'
+      );
+    }
   };
 
-  return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
-      {/* Top Bar Contract: 3 zones separated by gap-8 (Brand Wordmark, Nav Links, Primary CTA) */}
-      <header className={`sticky top-0 z-50 border-b backdrop-blur-md px-4 sm:px-8 py-3.5 flex items-center justify-between gap-8 ${isDarkMode ? 'bg-slate-950/80 border-slate-800' : 'bg-white/80 border-slate-200'}`}>
-        {/* Zone 1: Brand Wordmark */}
-        <div className="flex items-center space-x-3 whitespace-nowrap shrink-0">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-400 to-amber-500 flex items-center justify-center text-slate-950 font-black text-sm shadow-sm">
-            N
+  const handleSignOut = async () => {
+    setAuthError(null);
+    await logoutGoogle();
+  };
+
+  const isCloudSynced = Boolean(user && user.emailVerified);
+  const activeOwnerId = isCloudSynced && user ? user.uid : 'local-preview';
+
+  const handleSaveMember = async (member: LibraryMember, isUpdate: boolean) => {
+    setActionError(null);
+    if (isCloudSynced && user) {
+      await saveMemberToFirestore(user.uid, member, isUpdate);
+      return;
+    }
+
+    setMembers((prev) => {
+      const exists = prev.some((m) => m.docId === member.docId);
+      if (exists) {
+        return prev.map((m) => (m.docId === member.docId ? member : m));
+      }
+      return [...prev, member];
+    });
+  };
+
+  const handleDeleteMember = async (docId: string) => {
+    setActionError(null);
+    if (isCloudSynced && user) {
+      await deleteMemberFromFirestore(user.uid, docId);
+      return;
+    }
+    setMembers((prev) => prev.filter((m) => m.docId !== docId));
+  };
+
+  const handleRunReminderBatch = async (
+    eligible: Array<{ member: LibraryMember; daysLeft: number }>
+  ) => {
+    if (eligible.length === 0) return;
+    setActionError(null);
+    const today = getTodayKolkataIso();
+
+    const batchItems = eligible.map(({ member, daysLeft }) => {
+      const msg = buildWhatsAppReminderText(
+        member.name,
+        member.expiry_date,
+        config.libraryName
+      );
+      const log: ReminderLog = {
+        reminder_id: `rem_${Date.now()}_${member.member_id}`,
+        ownerId: activeOwnerId,
+        member_id: member.member_id,
+        member_name: member.name,
+        phone: member.phone,
+        expiry_date: member.expiry_date,
+        days_left: daysLeft,
+        message_preview: msg,
+        sent_date: today,
+        status: isCloudSynced ? 'Sent' : 'Simulated',
+      };
+      return { member, log };
+    });
+
+    if (isCloudSynced && user) {
+      await recordRemindersBatchInFirestore(user.uid, batchItems);
+      return;
+    }
+
+    const updatedIds = new Set(batchItems.map((i) => i.member.docId));
+    setMembers((prev) =>
+      prev.map((m) =>
+        updatedIds.has(m.docId) ? { ...m, last_reminder_date: today } : m
+      )
+    );
+    setReminders((prev) => [...batchItems.map((i) => i.log), ...prev]);
+  };
+
+  const handleQuickSendReminder = async (member: LibraryMember) => {
+    const today = getTodayKolkataIso();
+    if (member.last_reminder_date === today) return;
+    const daysLeft = computeDaysLeft(member.expiry_date, today);
+    await handleRunReminderBatch([{ member, daysLeft }]);
+  };
+
+  const handleRecordPayment = async (
+    member: LibraryMember,
+    amount: number,
+    mode: PaymentMode,
+    linkId: string
+  ): Promise<{ skipped: boolean; newExpiry: string }> => {
+    setActionError(null);
+    const today = getTodayKolkataIso();
+
+    // Idempotency guard from Chapter 6 (Workflow 3)
+    if (member.last_payment_ref && member.last_payment_ref === linkId) {
+      return { skipped: true, newExpiry: member.expiry_date };
+    }
+
+    const newExpiry = computeNextExpiryAfterPayment(member, today);
+    const payment: PaymentRecord = {
+      payment_id: `pay_${Date.now()}_${member.member_id}`,
+      ownerId: activeOwnerId,
+      member_doc_id: member.docId,
+      member_id: member.member_id,
+      member_name: member.name,
+      amount: Math.max(0, Number(amount) || 0),
+      mode,
+      link_id: linkId,
+      payment_date: today,
+      previous_expiry: member.expiry_date,
+      new_expiry: newExpiry,
+    };
+
+    if (isCloudSynced && user) {
+      await recordPaymentBatchInFirestore(user.uid, member, payment, newExpiry);
+      return { skipped: false, newExpiry };
+    }
+
+    setMembers((prev) =>
+      prev.map((m) =>
+        m.docId === member.docId
+          ? {
+              ...m,
+              payment_status: 'Paid',
+              last_payment_date: today,
+              expiry_date: newExpiry,
+              last_payment_ref: linkId,
+            }
+          : m
+      )
+    );
+    setPayments((prev) => [payment, ...prev]);
+    return { skipped: false, newExpiry };
+  };
+
+  const handleUpdateConfig = async (nextConfig: LibraryConfig) => {
+    setActionError(null);
+    if (isCloudSynced && user) {
+      await saveConfigToFirestore(user.uid, nextConfig);
+      return;
+    }
+    setConfig(nextConfig);
+  };
+
+  const handleToggleStep = async (stepId: string) => {
+    const exists = config.completedSteps.includes(stepId);
+    const nextSteps = exists
+      ? config.completedSteps.filter((id) => id !== stepId)
+      : [...config.completedSteps, stepId];
+    await handleUpdateConfig({
+      ...config,
+      completedSteps: nextSteps,
+    });
+  };
+
+  const activeNavItem =
+    NAV_ITEMS.find((n) => n.id === activeView) || NAV_ITEMS[0];
+
+  const handleSelectNav = (id: AppView) => {
+    setActiveView(id);
+    setMobileMenuOpen(false);
+  };
+
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full justify-between">
+      <div className="space-y-6">
+        {/* Brand Header */}
+        <div className="px-4 pt-5 pb-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+              <BookOpen className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-slate-900 dark:text-white font-['Outfit'] truncate">
+                Library Desk
+              </div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                {config.libraryName}
+              </div>
+            </div>
           </div>
-          <span className="text-base sm:text-lg font-bold tracking-tight">
-            {siteName || 'New Site Studio'}
-          </span>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(false)}
+            className="lg:hidden p-1 rounded text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+            aria-label="Close navigation menu"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Zone 2: Navigation Links */}
-        <nav className="hidden md:flex items-center gap-6 text-xs sm:text-sm font-medium">
-          <button
-            type="button"
-            onClick={() => setActiveTab('overview')}
-            className={`transition-colors whitespace-nowrap shrink-0 cursor-pointer ${activeTab === 'overview' ? (isDarkMode ? 'text-amber-400 font-semibold' : 'text-amber-600 font-semibold') : (isDarkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')}`}
-          >
-            Templates
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('builder')}
-            className={`transition-colors whitespace-nowrap shrink-0 cursor-pointer ${activeTab === 'builder' ? (isDarkMode ? 'text-amber-400 font-semibold' : 'text-amber-600 font-semibold') : (isDarkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')}`}
-          >
-            Customize
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('preview')}
-            className={`transition-colors whitespace-nowrap shrink-0 cursor-pointer ${activeTab === 'preview' ? (isDarkMode ? 'text-amber-400 font-semibold' : 'text-amber-600 font-semibold') : (isDarkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')}`}
-          >
-            Live Preview
-          </button>
+        {/* Navigation Links */}
+        <nav className="px-3 space-y-1" aria-label="Primary Sidebar Navigation">
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const active = activeView === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleSelectNav(item.id)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left ${
+                  active
+                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 font-semibold'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="truncate">{item.label}</span>
+              </button>
+            );
+          })}
         </nav>
+      </div>
 
-        {/* Zone 3: 1 Primary Action + Theme Toggle */}
-        <div className="flex items-center gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            className={`p-2 rounded-lg border transition-colors cursor-pointer ${isDarkMode ? 'border-slate-800 text-slate-300 hover:bg-slate-900' : 'border-slate-200 text-slate-600 hover:bg-slate-100'}`}
-            title="Toggle theme"
-            aria-label="Toggle theme"
-          >
-            {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('builder')}
-            className="px-4 py-2 text-xs font-semibold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 rounded-lg transition-all shadow-sm cursor-pointer whitespace-nowrap shrink-0 flex items-center space-x-1.5"
-          >
-            <span>Start Building</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </header>
-
-      {/* Main Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12 flex flex-col">
-        {/* Status Notification Banner */}
-        <div className={`p-4 rounded-xl border mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${isDarkMode ? 'bg-amber-950/20 border-amber-500/30 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
-          <div className="flex items-center space-x-2.5">
-            <CheckCircle2 className="w-5 h-5 text-amber-400 shrink-0" />
-            <div>
-              <p className="text-xs sm:text-sm font-bold">पुराना सारा डेटा और साइट सफलतापूर्वक हटा दी गई है (Old site removed completely).</p>
-              <p className="text-[11px] sm:text-xs opacity-80">अब आप अपनी पसंद की नई वेबसाइट शुरू कर सकते हैं। नीचे से प्रकार चुनें या चैट में बताएं।</p>
-            </div>
+      {/* Bottom Workspace Sync Card */}
+      <div className="p-3 border-t border-slate-200 dark:border-slate-800 space-y-2.5">
+        <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1.5">
+          <div className="text-[11px] font-semibold text-slate-800 dark:text-slate-200">
+            {isCloudSynced ? 'Cloud Firestore Synced' : 'Local Preview Mode'}
           </div>
-          <button
-            type="button"
-            onClick={() => setActiveTab('builder')}
-            className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shrink-0 cursor-pointer shadow-xs"
-          >
-            नई साइट डिज़ाइन करें
-          </button>
-        </div>
-
-        {/* Tab 1: Overview & Template Selection */}
-        {activeTab === 'overview' && (
-          <div className="space-y-10">
-            {/* Hero Heading */}
-            <div className="text-center max-w-2xl mx-auto space-y-3">
-              <h1 className="text-3xl sm:text-5xl font-black tracking-tight">
-                आप किस प्रकार की <span className="bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 bg-clip-text text-transparent">नई साइट</span> बनाना चाहते हैं?
-              </h1>
-              <p className={`text-sm sm:text-base leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                Choose a starter template or describe your vision. All previous templates and data have been wiped clean for your fresh project.
-              </p>
-            </div>
-
-            {/* Template Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {TEMPLATES.map((tmpl) => {
-                const isSelected = selectedTemplate === tmpl.id;
-                return (
-                  <div
-                    key={tmpl.id}
-                    onClick={() => {
-                      setSelectedTemplate(tmpl.id);
-                      if (tmpl.id === 'ecommerce') setSiteName('Aura Retail Store');
-                      else if (tmpl.id === 'business') setSiteName('Vanguard Consulting');
-                      else if (tmpl.id === 'coaching') setSiteName('Apex Academy');
-                      else if (tmpl.id === 'saas') setSiteName('Pulse Analytics');
-                      else if (tmpl.id === 'portfolio') setSiteName('Maan Singh | Developer');
-                      else setSiteName('NextGen Studio');
-                    }}
-                    className={`rounded-2xl p-6 border transition-all cursor-pointer flex flex-col justify-between text-left ${isSelected ? (isDarkMode ? 'bg-slate-900 border-amber-400 ring-2 ring-amber-400/30' : 'bg-white border-amber-500 ring-2 ring-amber-500/20 shadow-lg') : (isDarkMode ? 'bg-slate-900/60 border-slate-800 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300 shadow-xs')}`}
-                  >
-                    <div>
-                      {/* Card Header */}
-                      <div className="flex items-center justify-between mb-4">
-                        <span className={`text-[11px] font-semibold tracking-wider uppercase ${isDarkMode ? 'text-amber-400' : 'text-amber-600'}`}>
-                          {tmpl.category}
-                        </span>
-                        {isSelected && (
-                          <span className="w-5 h-5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center">
-                            <Check className="w-3.5 h-3.5 stroke-[3]" />
-                          </span>
-                        )}
-                      </div>
-
-                      <h3 className="text-lg font-bold mb-1">{tmpl.title}</h3>
-                      <p className={`text-xs font-medium mb-3 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {tmpl.hindiTitle}
-                      </p>
-
-                      <p className={`text-xs leading-relaxed mb-4 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                        {tmpl.description}
-                      </p>
-
-                      {/* Feature Checklist */}
-                      <div className="space-y-1.5 pt-3 border-t border-slate-800/40 dark:border-slate-800">
-                        {tmpl.features.map((feat, idx) => (
-                          <div key={idx} className="flex items-center space-x-2 text-[11px]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                            <span className={isDarkMode ? 'text-slate-400' : 'text-slate-600'}>{feat}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Bottom Action */}
-                    <div className="mt-6 pt-4 border-t border-slate-800/40 dark:border-slate-800 flex items-center justify-between">
-                      <span className="text-[11px] text-slate-500">
-                        {tmpl.recommendedPages.length} Core Sections
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedTemplate(tmpl.id);
-                          setActiveTab('builder');
-                        }}
-                        className={`text-xs font-semibold flex items-center space-x-1 cursor-pointer transition-colors ${isSelected ? 'text-amber-400' : 'text-slate-400 hover:text-white'}`}
-                      >
-                        <span>Customize</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Tab 2: Customization & Vision Input */}
-        {activeTab === 'builder' && (
-          <div className="max-w-3xl mx-auto w-full space-y-8">
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight mb-2">अपनी नई साइट की जानकारी भरें</h2>
-              <p className={`text-xs sm:text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                Configure the title, tagline, and details for your new website.
-              </p>
-            </div>
-
-            <div className={`p-6 sm:p-8 rounded-2xl border space-y-6 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
-              {/* Selected Type */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                  चयनित श्रेणी (Selected Type)
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {TEMPLATES.map((tmpl) => (
-                    <button
-                      key={tmpl.id}
-                      type="button"
-                      onClick={() => setSelectedTemplate(tmpl.id)}
-                      className={`p-2.5 rounded-xl border text-xs font-medium text-left transition-all cursor-pointer ${selectedTemplate === tmpl.id ? (isDarkMode ? 'border-amber-400 bg-amber-400/10 text-amber-300' : 'border-amber-500 bg-amber-50 text-amber-900 font-bold') : (isDarkMode ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100')}`}
-                    >
-                      <div className="truncate">{tmpl.title.split('&')[0]}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Site Name Input */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                  वेबसाइट का नाम (Website Name)
-                </label>
-                <input
-                  type="text"
-                  value={siteName}
-                  onChange={(e) => setSiteName(e.target.value)}
-                  placeholder="e.g. Acme Tech, Modern Store, Krishna Academy"
-                  className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 ${isDarkMode ? 'bg-slate-950 border-slate-800 text-white placeholder-slate-600' : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'}`}
-                />
-              </div>
-
-              {/* Tagline Input */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                  टैगलाइन या मुख्य संदेश (Tagline / Catchphrase)
-                </label>
-                <input
-                  type="text"
-                  value={siteTagline}
-                  onChange={(e) => setSiteTagline(e.target.value)}
-                  placeholder="e.g. Premium shopping for everyone / Best coaching in your city"
-                  className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 ${isDarkMode ? 'bg-slate-950 border-slate-800 text-white placeholder-slate-600' : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'}`}
-                />
-              </div>
-
-              {/* Special Features / Prompts */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                  विशिष्ट सुविधाएं या आवश्यकताएं (Special Requirements / Features)
-                </label>
-                <textarea
-                  rows={4}
-                  value={userPrompt}
-                  onChange={(e) => setUserPrompt(e.target.value)}
-                  placeholder="अपनी पसंद के पेज, रंग, प्रोडक्ट्स या कोई विशेष फीचर यहाँ लिखें... (e.g. Add dark theme, WhatsApp chat button, testimonials section, contact form, pricing table)"
-                  className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 ${isDarkMode ? 'bg-slate-950 border-slate-800 text-white placeholder-slate-600' : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'}`}
-                />
-              </div>
-
-              {/* Actions */}
-              <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={handleCopyPrompt}
-                  className={`w-full sm:w-auto px-4 py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center space-x-2 transition-all cursor-pointer ${isDarkMode ? 'border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-300' : 'border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
-                >
-                  {copiedNotification ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400">कॉपी हो गया! (Copied)</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>प्रॉम्प्ट कॉपी करें (Copy Prompt)</span>
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('preview')}
-                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-bold text-xs transition-all shadow-md cursor-pointer flex items-center justify-center space-x-2"
-                >
-                  <span>लाइव पूर्वावलोकन देखें (View Preview)</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 3: Interactive Live Preview Container */}
-        {activeTab === 'preview' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold tracking-tight">लाइव पूर्वावलोकन (Live Blueprint Preview)</h2>
-                <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  This is the starting foundation for {siteName}. Tell us in chat to implement full content or pages!
-                </p>
-              </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('builder')}
-                  className="px-3 py-1.5 rounded-lg border text-xs font-medium cursor-pointer border-slate-700 hover:bg-slate-800 text-slate-300"
-                >
-                  Edit Details
-                </button>
-              </div>
-            </div>
-
-            {/* Simulated Live Site Frame */}
-            <div className={`rounded-2xl border overflow-hidden shadow-2xl ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-              {/* Fake Browser Toolbar */}
-              <div className={`px-4 py-2.5 border-b flex items-center justify-between ${isDarkMode ? 'bg-slate-950/60 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
-                <div className="flex items-center space-x-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
-                </div>
-                <div className={`text-[11px] font-mono px-3 py-0.5 rounded-md ${isDarkMode ? 'bg-slate-900 text-slate-400' : 'bg-white text-slate-500 border border-slate-200'}`}>
-                  https://{siteName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'mysite'}.studio.app
-                </div>
-                <div className="text-[11px] font-medium text-amber-400">
-                  Live Scaffolding
-                </div>
-              </div>
-
-              {/* Preview Content Body */}
-              <div className="p-8 sm:p-14 space-y-12">
-                {/* Hero Section */}
-                <div className="text-center max-w-2xl mx-auto space-y-4">
-                  <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
-                    {currentTemplate.title}
-                  </span>
-                  <h1 className="text-3xl sm:text-5xl font-black tracking-tight">
-                    {siteName}
-                  </h1>
-                  <p className={`text-sm sm:text-base leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                    {siteTagline}
-                  </p>
-                  <div className="pt-2 flex items-center justify-center gap-3">
-                    <button
-                      type="button"
-                      className="px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow-md transition-all cursor-pointer"
-                    >
-                      Explore Features
-                    </button>
-                    <button
-                      type="button"
-                      className={`px-5 py-2.5 rounded-xl border text-xs font-semibold cursor-pointer ${isDarkMode ? 'border-slate-800 hover:bg-slate-800 text-white' : 'border-slate-300 hover:bg-slate-100 text-slate-900'}`}
-                    >
-                      Contact Us
-                    </button>
-                  </div>
-                </div>
-
-                {/* Simulated Feature Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6">
-                  {currentTemplate.features.slice(0, 3).map((feature, i) => (
-                    <div
-                      key={i}
-                      className={`p-5 rounded-xl border text-left ${isDarkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-amber-400/10 text-amber-400 flex items-center justify-center font-bold text-xs mb-3">
-                        0{i + 1}
-                      </div>
-                      <h4 className="text-sm font-bold mb-1">{feature}</h4>
-                      <p className="text-xs text-slate-500">
-                        Tailored module engineered for high performance and responsiveness.
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Section Structure Roadmap */}
-                <div className={`p-6 rounded-xl border ${isDarkMode ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50/80 border-slate-200'}`}>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-                    Recommended Site Architecture
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {currentTemplate.recommendedPages.map((page, idx) => (
-                      <span
-                        key={idx}
-                        className={`text-xs px-3 py-1 rounded-lg border font-medium ${isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}
-                      >
-                        {page}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className={`border-t py-6 text-xs ${isDarkMode ? 'border-slate-800/80 bg-slate-950 text-slate-500' : 'border-slate-200 bg-white text-slate-500'}`}>
-        <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-          <p>© {new Date().getFullYear()} {siteName}. All previous data removed successfully.</p>
-          <p className="text-[11px] text-slate-500">
-            Tell me in chat what specific site and pages you want, and I will build it immediately.
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+            {isCloudSynced
+              ? `Signed in as ${user?.email || 'Library Owner'}`
+              : 'Sign in with Google to save members, payments, and checklist permanently.'}
           </p>
         </div>
-      </footer>
+
+        {isCloudSynced ? (
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sign Out</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleSignIn}
+            disabled={!authReady}
+            className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Sign in with Google</span>
+          </button>
+        )}
+      </div>
     </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex">
+      {/* Desktop Sidebar (240px) */}
+      <aside className="hidden lg:block w-60 shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 sticky top-0 h-screen">
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile Drawer */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden flex">
+          <div
+            className="fixed inset-0 bg-slate-950/50"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <aside className="relative w-64 max-w-[80vw] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 h-full z-10">
+            <SidebarContent />
+          </aside>
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Top Bar Contract: Breadcrumb Left — Actions Right */}
+        <header className="sticky top-0 z-30 h-14 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="lg:hidden p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
+              aria-label="Open navigation menu"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-2 text-xs truncate">
+              <span className="font-semibold text-slate-900 dark:text-white whitespace-nowrap">
+                Library Desk
+              </span>
+              <span className="text-slate-400" aria-hidden="true">/</span>
+              <span className="text-slate-600 dark:text-slate-300 font-medium truncate">
+                {activeNavItem.breadcrumb}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsDark((prev) => !prev)}
+              className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={isDark ? 'Light Mode' : 'Dark Mode'}
+            >
+              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+
+            {!isCloudSynced && (
+              <button
+                type="button"
+                onClick={handleSignIn}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sync Cloud</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setActiveView('entry')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>New Member</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Main Viewport */}
+        <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto space-y-5">
+          {(authError || actionError) && (
+            <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-800 dark:text-rose-300 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{authError || actionError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthError(null);
+                  setActionError(null);
+                }}
+                className="text-xs font-semibold underline cursor-pointer shrink-0"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {activeView === 'dashboard' && (
+            <DashboardView
+              members={members}
+              payments={payments}
+              config={config}
+              isLoading={isDataLoading}
+              onNavigate={setActiveView}
+              onUpdateConfig={handleUpdateConfig}
+              onQuickSendReminder={handleQuickSendReminder}
+            />
+          )}
+
+          {activeView === 'members' && (
+            <MembersSheetView
+              members={members}
+              onSaveMember={handleSaveMember}
+              onDeleteMember={handleDeleteMember}
+              onNavigateToEntry={() => setActiveView('entry')}
+            />
+          )}
+
+          {activeView === 'entry' && (
+            <MemberEntryView
+              ownerId={activeOwnerId}
+              members={members}
+              onSaveMember={handleSaveMember}
+            />
+          )}
+
+          {activeView === 'reminders' && (
+            <RemindersView
+              members={members}
+              reminders={reminders}
+              libraryName={config.libraryName}
+              onRunReminderBatch={handleRunReminderBatch}
+            />
+          )}
+
+          {activeView === 'payments' && (
+            <PaymentsView
+              members={members}
+              payments={payments}
+              onRecordPayment={handleRecordPayment}
+            />
+          )}
+
+          {activeView === 'report' && (
+            <DailyReportView members={members} config={config} />
+          )}
+
+          {activeView === 'guide' && (
+            <AutomationGuideView
+              completedSteps={config.completedSteps}
+              onToggleStep={handleToggleStep}
+            />
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <LibraryDeskWorkspace />
+    </ErrorBoundary>
   );
 }

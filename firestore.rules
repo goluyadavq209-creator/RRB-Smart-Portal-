@@ -2,91 +2,290 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
-    function isAuthenticated() {
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core Helpers
+    function isSignedIn() {
       return request.auth != null;
     }
 
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isEmailVerified() && request.auth.uid == userId;
     }
 
-    function isAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.admin == true ||
-        (request.auth.token.email != null && request.auth.token.email in [
-          'maansinghyadav095@gmail.com',
-          'ymaan841@gmail.com',
-          'admin@rrb-smart-portal.gov.in'
-        ]) ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        (request.auth.token.email != null && exists(/databases/$(database)/documents/admins/$(request.auth.token.email)))
-      );
+    function incoming() {
+      return request.resource.data;
     }
 
-    // Authorization Helper for Portal Data
-    function canWriteData() {
-      return isAdmin() || !exists(/databases/$(database)/documents/portalSettings/initialized);
+    function existing() {
+      return resource.data;
     }
 
-    // Admins authorization registry
-    match /admins/{adminId} {
-      allow read: if true;
-      allow write: if canWriteData();
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    // Public Portal Collections: Public read, Admin write (or initial setup)
-    match /notices/{noticeId} {
-      allow read: if true;
-      allow create, update, delete: if canWriteData();
+    function isValidIsoDate(val) {
+      return val is string && val.size() == 10 && val.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
     }
 
-    match /exams/{examId} {
-      allow read: if true;
-      allow create, update, delete: if canWriteData();
+    function isValidOptionalIsoDate(val) {
+      return val is string && (val == '' || isValidIsoDate(val));
     }
 
-    match /cutoffs/{cutoffId} {
-      allow read: if true;
-      allow create, update, delete: if canWriteData();
+    // Validation Blueprint: UserProfile
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'libraryName', 'totalSeats', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'displayName', 'libraryName', 'totalSeats', 'createdAt']) &&
+        data.uid is string && data.uid == userId && data.uid == request.auth.uid && isValidId(data.uid) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 200 &&
+        (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 120)) &&
+        data.libraryName is string && data.libraryName.size() >= 1 && data.libraryName.size() <= 120 &&
+        data.totalSeats is number && data.totalSeats >= 1 && data.totalSeats <= 5000 &&
+        data.createdAt is timestamp;
     }
 
-    match /results/{resultId} {
-      allow read: if true;
-      allow create, update, delete: if canWriteData();
+    // Validation Blueprint: LibraryMember
+    function isValidLibraryMember(data, userId) {
+      return data.keys().hasAll([
+          'member_id', 'ownerId', 'name', 'phone', 'plan', 'plan_months', 'fee',
+          'start_date', 'expiry_date', 'payment_status', 'last_payment_date',
+          'last_reminder_date', 'last_payment_ref', 'seat_no', 'shift',
+          'whatsapp_opt_in', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'member_id', 'ownerId', 'name', 'phone', 'plan', 'plan_months', 'fee',
+          'start_date', 'expiry_date', 'payment_status', 'last_payment_date',
+          'last_reminder_date', 'last_payment_ref', 'seat_no', 'shift',
+          'whatsapp_opt_in', 'createdAt', 'updatedAt'
+        ]) &&
+        data.member_id is string && data.member_id.size() >= 4 && data.member_id.size() <= 32 &&
+        data.member_id.matches('^LIB-[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId is string && data.ownerId == userId && data.ownerId == request.auth.uid &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+        data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 15 && data.phone.matches('^[0-9]+$') &&
+        data.plan in ['Monthly', 'Quarterly', 'Half-yearly', 'Yearly'] &&
+        data.plan_months in [1, 3, 6, 12] &&
+        data.fee is number && data.fee >= 0 && data.fee <= 1000000 &&
+        isValidIsoDate(data.start_date) &&
+        isValidIsoDate(data.expiry_date) &&
+        data.payment_status in ['Pending', 'Paid'] &&
+        isValidOptionalIsoDate(data.last_payment_date) &&
+        isValidOptionalIsoDate(data.last_reminder_date) &&
+        data.last_payment_ref is string && data.last_payment_ref.size() <= 120 &&
+        data.seat_no is string && data.seat_no.size() >= 1 && data.seat_no.size() <= 20 &&
+        data.shift in ['Morning', 'Afternoon', 'Evening', 'Full Day', 'Night'] &&
+        data.whatsapp_opt_in is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
     }
 
-    match /mockTests/{testId} {
-      allow read: if true;
-      allow create, update, delete: if canWriteData();
+    // Validation Blueprint: PaymentRecord
+    function isValidPaymentRecord(data, userId) {
+      return data.keys().hasAll([
+          'payment_id', 'ownerId', 'member_doc_id', 'member_id', 'member_name',
+          'amount', 'mode', 'link_id', 'payment_date', 'previous_expiry',
+          'new_expiry', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'payment_id', 'ownerId', 'member_doc_id', 'member_id', 'member_name',
+          'amount', 'mode', 'link_id', 'payment_date', 'previous_expiry',
+          'new_expiry', 'createdAt'
+        ]) &&
+        isValidId(data.payment_id) &&
+        data.ownerId is string && data.ownerId == userId && data.ownerId == request.auth.uid &&
+        isValidId(data.member_doc_id) &&
+        data.member_id is string && data.member_id.size() >= 4 && data.member_id.size() <= 32 &&
+        data.member_name is string && data.member_name.size() >= 1 && data.member_name.size() <= 100 &&
+        data.amount is number && data.amount >= 0 && data.amount <= 1000000 &&
+        data.mode in ['Razorpay', 'UPI', 'Cash'] &&
+        data.link_id is string && data.link_id.size() >= 1 && data.link_id.size() <= 120 &&
+        isValidIsoDate(data.payment_date) &&
+        isValidOptionalIsoDate(data.previous_expiry) &&
+        isValidIsoDate(data.new_expiry) &&
+        data.createdAt is timestamp;
     }
 
-    match /answerKeys/{keyId} {
-      allow read: if true;
-      allow create, update, delete: if canWriteData();
+    // Validation Blueprint: ReminderLog
+    function isValidReminderLog(data, userId) {
+      return data.keys().hasAll([
+          'reminder_id', 'ownerId', 'member_id', 'member_name', 'phone',
+          'expiry_date', 'days_left', 'message_preview', 'sent_date',
+          'status', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'reminder_id', 'ownerId', 'member_id', 'member_name', 'phone',
+          'expiry_date', 'days_left', 'message_preview', 'sent_date',
+          'status', 'createdAt'
+        ]) &&
+        isValidId(data.reminder_id) &&
+        data.ownerId is string && data.ownerId == userId && data.ownerId == request.auth.uid &&
+        data.member_id is string && data.member_id.size() >= 4 && data.member_id.size() <= 32 &&
+        data.member_name is string && data.member_name.size() >= 1 && data.member_name.size() <= 100 &&
+        data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 15 &&
+        isValidIsoDate(data.expiry_date) &&
+        data.days_left is number && data.days_left >= -3650 && data.days_left <= 3650 &&
+        data.message_preview is string && data.message_preview.size() >= 1 && data.message_preview.size() <= 500 &&
+        isValidIsoDate(data.sent_date) &&
+        data.status in ['Sent', 'Simulated'] &&
+        data.createdAt is timestamp;
     }
 
-    match /studyMaterials/{materialId} {
-      allow read: if true;
-      allow create, update, delete: if canWriteData();
+    // Validation Blueprint: LibraryConfig
+    function isValidLibraryConfig(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'libraryName', 'ownerEmail', 'ownerPhone',
+          'totalSeats', 'completedSteps', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'libraryName', 'ownerEmail', 'ownerPhone',
+          'totalSeats', 'completedSteps', 'updatedAt'
+        ]) &&
+        data.ownerId is string && data.ownerId == userId && data.ownerId == request.auth.uid &&
+        data.libraryName is string && data.libraryName.size() >= 1 && data.libraryName.size() <= 120 &&
+        data.ownerEmail is string && data.ownerEmail.size() <= 200 &&
+        data.ownerPhone is string && data.ownerPhone.size() <= 20 &&
+        data.totalSeats is number && data.totalSeats >= 1 && data.totalSeats <= 5000 &&
+        data.completedSteps is list && data.completedSteps.size() <= 20 &&
+        (data.completedSteps.size() == 0 || (data.completedSteps[0] is string && data.completedSteps[0].size() <= 64)) &&
+        data.updatedAt is timestamp;
     }
 
-    // Candidate links and portal config
-    match /portalLinks/{linkId} {
-      allow read: if true;
-      allow create, update, delete: if canWriteData();
-    }
-
-    match /portalSettings/{settingId} {
-      allow read: if true;
-      allow create, update, delete: if canWriteData();
-    }
-
-    // User profiles
+    // User Root Profile
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isOwner(userId) || isAdmin();
-      allow delete: if isAdmin();
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false;
+      allow create: if isValidId(userId) &&
+        isOwner(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().createdAt == request.time;
+      allow update: if isValidId(userId) &&
+        isOwner(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'libraryName', 'totalSeats']);
+      allow delete: if false;
+
+      // Subcollection: Library Members
+      match /members/{memberId} {
+        allow get: if isValidId(userId) && isValidId(memberId) &&
+          isOwner(userId) &&
+          existing().ownerId == request.auth.uid;
+
+        allow list: if isValidId(userId) &&
+          isOwner(userId) &&
+          resource.data.ownerId == request.auth.uid;
+
+        allow create: if isValidId(userId) && isValidId(memberId) &&
+          isOwner(userId) &&
+          isValidLibraryMember(incoming(), userId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          exists(/databases/$(database)/documents/users/$(userId));
+
+        allow update: if isValidId(userId) && isValidId(memberId) &&
+          isOwner(userId) &&
+          isValidLibraryMember(incoming(), userId) &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().member_id == existing().member_id &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (
+            // Action 1: Update member profile / plan / seat
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'phone', 'plan', 'plan_months', 'fee', 'start_date',
+              'expiry_date', 'payment_status', 'seat_no', 'shift',
+              'whatsapp_opt_in', 'updatedAt'
+            ]) ||
+            // Action 2: Record WhatsApp reminder sent
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'last_reminder_date', 'updatedAt'
+            ]) ||
+            // Action 3: Record payment & extend expiry
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'payment_status', 'last_payment_date', 'expiry_date',
+              'last_payment_ref', 'updatedAt'
+            ])
+          );
+
+        allow delete: if isValidId(userId) && isValidId(memberId) &&
+          isOwner(userId) &&
+          existing().ownerId == request.auth.uid;
+      }
+
+      // Subcollection: Payment Ledger (Append-only)
+      match /payments/{paymentId} {
+        allow get: if isValidId(userId) && isValidId(paymentId) &&
+          isOwner(userId) &&
+          existing().ownerId == request.auth.uid;
+
+        allow list: if isValidId(userId) &&
+          isOwner(userId) &&
+          resource.data.ownerId == request.auth.uid;
+
+        allow create: if isValidId(userId) && isValidId(paymentId) &&
+          isOwner(userId) &&
+          isValidPaymentRecord(incoming(), userId) &&
+          incoming().createdAt == request.time &&
+          exists(/databases/$(database)/documents/users/$(userId)) &&
+          exists(/databases/$(database)/documents/users/$(userId)/members/$(incoming().member_doc_id));
+
+        allow update, delete: if false;
+      }
+
+      // Subcollection: Reminder Dispatch Logs (Append-only)
+      match /reminders/{reminderId} {
+        allow get: if isValidId(userId) && isValidId(reminderId) &&
+          isOwner(userId) &&
+          existing().ownerId == request.auth.uid;
+
+        allow list: if isValidId(userId) &&
+          isOwner(userId) &&
+          resource.data.ownerId == request.auth.uid;
+
+        allow create: if isValidId(userId) && isValidId(reminderId) &&
+          isOwner(userId) &&
+          isValidReminderLog(incoming(), userId) &&
+          incoming().createdAt == request.time &&
+          exists(/databases/$(database)/documents/users/$(userId));
+
+        allow update, delete: if false;
+      }
+
+      // Subcollection: Library Config & Checklist
+      match /config/{configId} {
+        allow get: if isValidId(userId) && isValidId(configId) &&
+          isOwner(userId) &&
+          existing().ownerId == request.auth.uid;
+
+        allow list: if false;
+
+        allow create: if isValidId(userId) && isValidId(configId) &&
+          isOwner(userId) &&
+          isValidLibraryConfig(incoming(), userId) &&
+          incoming().updatedAt == request.time &&
+          exists(/databases/$(database)/documents/users/$(userId));
+
+        allow update: if isValidId(userId) && isValidId(configId) &&
+          isOwner(userId) &&
+          isValidLibraryConfig(incoming(), userId) &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'libraryName', 'ownerEmail', 'ownerPhone', 'totalSeats',
+            'completedSteps', 'updatedAt'
+          ]);
+
+        allow delete: if false;
+      }
     }
   }
 }

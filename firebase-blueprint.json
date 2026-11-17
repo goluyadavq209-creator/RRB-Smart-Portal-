@@ -1,183 +1,356 @@
 {
   "entities": {
-    "Notice": {
-      "title": "Notice",
-      "description": "Official Railway notices and alerts",
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated library owner profile and workspace root",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "title": { "type": "string" },
-        "cenNumber": { "type": "string" },
-        "publishDate": { "type": "string" },
-        "category": { "type": "string" },
-        "description": { "type": "string" },
-        "pdfUrl": { "type": "string" },
-        "isNew": { "type": "boolean" },
-        "isImportant": { "type": "boolean" },
-        "createdAt": { "type": "string" }
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "libraryName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "totalSeats": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["title", "publishDate"]
+      "required": ["uid", "email", "libraryName", "totalSeats", "createdAt"]
     },
-    "Exam": {
-      "title": "Exam",
-      "description": "Railway recruitment CEN examinations",
+    "LibraryMember": {
+      "title": "LibraryMember",
+      "description": "Library member record mirroring the 12-column Sheet plus seat/shift details",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "cenNumber": { "type": "string" },
-        "title": { "type": "string" },
-        "shortCode": { "type": "string" },
-        "department": { "type": "string" },
-        "status": { "type": "string" },
-        "totalVacancies": { "type": "number" },
-        "applicationStart": { "type": "string" },
-        "applicationEnd": { "type": "string" },
-        "examStages": { "type": "string" },
-        "officialPdfUrl": { "type": "string" }
+        "member_id": {
+          "type": "string",
+          "maxLength": 32,
+          "pattern": "^LIB-[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "phone": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 15,
+          "pattern": "^[0-9]+$"
+        },
+        "plan": {
+          "type": "string",
+          "enum": ["Monthly", "Quarterly", "Half-yearly", "Yearly"],
+          "maxLength": 20
+        },
+        "plan_months": {
+          "type": "number"
+        },
+        "fee": {
+          "type": "number"
+        },
+        "start_date": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "expiry_date": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "payment_status": {
+          "type": "string",
+          "enum": ["Pending", "Paid"],
+          "maxLength": 10
+        },
+        "last_payment_date": {
+          "type": "string",
+          "maxLength": 10
+        },
+        "last_reminder_date": {
+          "type": "string",
+          "maxLength": 10
+        },
+        "last_payment_ref": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "seat_no": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20
+        },
+        "shift": {
+          "type": "string",
+          "enum": ["Morning", "Afternoon", "Evening", "Full Day", "Night"],
+          "maxLength": 20
+        },
+        "whatsapp_opt_in": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["title", "cenNumber"]
+      "required": [
+        "member_id",
+        "ownerId",
+        "name",
+        "phone",
+        "plan",
+        "plan_months",
+        "fee",
+        "start_date",
+        "expiry_date",
+        "payment_status",
+        "last_payment_date",
+        "last_reminder_date",
+        "last_payment_ref",
+        "seat_no",
+        "shift",
+        "whatsapp_opt_in",
+        "createdAt",
+        "updatedAt"
+      ]
     },
-    "Cutoff": {
-      "title": "Cutoff",
-      "description": "Official category cut-off marks for RRB exams",
+    "PaymentRecord": {
+      "title": "PaymentRecord",
+      "description": "Payment transaction and renewal history entry",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "cenNumber": { "type": "string" },
-        "zoneCode": { "type": "string" },
-        "zoneName": { "type": "string" },
-        "postName": { "type": "string" },
-        "stage": { "type": "string" },
-        "year": { "type": "number" },
-        "ur": { "type": "number" },
-        "obc": { "type": "number" },
-        "sc": { "type": "number" },
-        "st": { "type": "number" },
-        "ews": { "type": "number" }
+        "payment_id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "member_doc_id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "member_id": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "member_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "amount": {
+          "type": "number"
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["Razorpay", "UPI", "Cash"],
+          "maxLength": 20
+        },
+        "link_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "payment_date": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "previous_expiry": {
+          "type": "string",
+          "maxLength": 10
+        },
+        "new_expiry": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["cenNumber", "zoneCode", "postName"]
+      "required": [
+        "payment_id",
+        "ownerId",
+        "member_doc_id",
+        "member_id",
+        "member_name",
+        "amount",
+        "mode",
+        "link_id",
+        "payment_date",
+        "previous_expiry",
+        "new_expiry",
+        "createdAt"
+      ]
     },
-    "Result": {
-      "title": "Result",
-      "description": "Declared merit lists and examination results",
+    "ReminderLog": {
+      "title": "ReminderLog",
+      "description": "Log of WhatsApp expiry reminders sent to library members",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "cenNumber": { "type": "string" },
-        "examTitle": { "type": "string" },
-        "zoneCode": { "type": "string" },
-        "zoneName": { "type": "string" },
-        "stage": { "type": "string" },
-        "publishDate": { "type": "string" },
-        "type": { "type": "string" },
-        "fileUrl": { "type": "string" }
+        "reminder_id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "member_id": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "member_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "phone": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 15
+        },
+        "expiry_date": {
+          "type": "string",
+          "maxLength": 10
+        },
+        "days_left": {
+          "type": "number"
+        },
+        "message_preview": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "sent_date": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Sent", "Simulated"],
+          "maxLength": 20
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["cenNumber", "examTitle", "publishDate"]
+      "required": [
+        "reminder_id",
+        "ownerId",
+        "member_id",
+        "member_name",
+        "phone",
+        "expiry_date",
+        "days_left",
+        "message_preview",
+        "sent_date",
+        "status",
+        "createdAt"
+      ]
     },
-    "MockTest": {
-      "title": "MockTest",
-      "description": "Mock tests and practice question sets",
+    "LibraryConfig": {
+      "title": "LibraryConfig",
+      "description": "Library automation setup preferences and checklist progress",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "title": { "type": "string" },
-        "cenNumber": { "type": "string" },
-        "subject": { "type": "string" },
-        "durationMinutes": { "type": "number" },
-        "totalQuestions": { "type": "number" }
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "libraryName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "ownerEmail": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "ownerPhone": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "totalSeats": {
+          "type": "number"
+        },
+        "completedSteps": {
+          "type": "array"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["title"]
-    },
-    "AnswerKey": {
-      "title": "AnswerKey",
-      "description": "Provisional and final answer keys with objection links",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "cenNumber": { "type": "string" },
-        "examTitle": { "type": "string" },
-        "stage": { "type": "string" },
-        "shift": { "type": "string" },
-        "examDate": { "type": "string" },
-        "keyUrl": { "type": "string" }
-      },
-      "required": ["cenNumber", "examTitle"]
-    },
-    "StudyMaterial": {
-      "title": "StudyMaterial",
-      "description": "Preparation guides and syllabus PDFs",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "title": { "type": "string" },
-        "category": { "type": "string" },
-        "fileUrl": { "type": "string" },
-        "cenNumber": { "type": "string" }
-      },
-      "required": ["title"]
-    },
-    "User": {
-      "title": "User",
-      "description": "Authenticated student/candidate user record",
-      "type": "object",
-      "properties": {
-        "uid": { "type": "string" },
-        "email": { "type": "string" },
-        "displayName": { "type": "string" },
-        "role": { "type": "string" },
-        "createdAt": { "type": "string" }
-      },
-      "required": ["uid", "email"]
-    },
-    "Admin": {
-      "title": "Admin",
-      "description": "Authorized administrators list for role verification",
-      "type": "object",
-      "properties": {
-        "uid": { "type": "string" },
-        "email": { "type": "string" },
-        "role": { "type": "string" },
-        "grantedAt": { "type": "string" }
-      },
-      "required": ["email", "role"]
+      "required": [
+        "ownerId",
+        "libraryName",
+        "ownerEmail",
+        "ownerPhone",
+        "totalSeats",
+        "completedSteps",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
-    "/notices/{noticeId}": {
-      "schema": "Notice",
-      "description": "Public railway recruitment notices sorted by date"
-    },
-    "/exams/{examId}": {
-      "schema": "Exam",
-      "description": "Centralized active railway recruitment exams"
-    },
-    "/cutoffs/{cutoffId}": {
-      "schema": "Cutoff",
-      "description": "Official category cut-off marks across all 21 RRBs"
-    },
-    "/results/{resultId}": {
-      "schema": "Result",
-      "description": "Candidate merit lists and result circulars"
-    },
-    "/mockTests/{testId}": {
-      "schema": "MockTest",
-      "description": "CBT practice tests and sample papers"
-    },
-    "/answerKeys/{keyId}": {
-      "schema": "AnswerKey",
-      "description": "Provisional answer keys and response sheets"
-    },
-    "/studyMaterials/{materialId}": {
-      "schema": "StudyMaterial",
-      "description": "Preparation guides and syllabus PDFs"
-    },
     "/users/{userId}": {
-      "schema": "User",
-      "description": "Registered candidate profile records"
+      "schema": "UserProfile",
+      "description": "Library owner root profile document"
     },
-    "/admins/{adminId}": {
-      "schema": "Admin",
-      "description": "Secure list of authorized administrator emails/UIDs"
+    "/users/{userId}/members/{memberId}": {
+      "schema": "LibraryMember",
+      "description": "Library members tracked by this owner"
+    },
+    "/users/{userId}/payments/{paymentId}": {
+      "schema": "PaymentRecord",
+      "description": "Payment and renewal ledger for this library"
+    },
+    "/users/{userId}/reminders/{reminderId}": {
+      "schema": "ReminderLog",
+      "description": "WhatsApp expiry reminder dispatch history"
+    },
+    "/users/{userId}/config/{configId}": {
+      "schema": "LibraryConfig",
+      "description": "Library automation configuration and checklist state"
     }
   }
 }
