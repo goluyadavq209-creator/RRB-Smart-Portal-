@@ -1,626 +1,314 @@
-import React, { useEffect, useState } from 'react';
-import {
-  BookOpen,
-  LayoutDashboard,
-  Table2,
-  UserPlus,
-  BellRing,
-  CreditCard,
-  FileBarChart,
-  Workflow,
-  Sun,
-  Moon,
-  LogIn,
-  LogOut,
-  Menu,
-  X,
-  AlertCircle,
+import React, { useState, useEffect } from 'react';
+import { 
+  Building2, 
+  ShieldCheck, 
+  Upload, 
+  Download, 
+  ExternalLink, 
+  Globe, 
+  FileText, 
+  Database,
+  Heart,
+  Lock,
+  Sparkles,
+  Bot
 } from 'lucide-react';
-import {
-  auth,
-  googleSignIn,
-  logoutGoogle,
-  onAuthStateChanged,
-  User,
-} from './lib/firebase';
-import {
-  AppView,
-  LibraryConfig,
-  LibraryMember,
-  PaymentMode,
-  PaymentRecord,
-  ReminderLog,
-} from './types/library';
-import {
-  buildSampleMembers,
-  buildSamplePayments,
-  buildSampleReminders,
-} from './data/libraryGuideData';
-import {
-  buildWhatsAppReminderText,
-  computeDaysLeft,
-  computeNextExpiryAfterPayment,
-  getTodayKolkataIso,
-} from './utils/libraryLogic';
-import {
-  deleteMemberFromFirestore,
-  ensureOwnerWorkspace,
-  recordPaymentBatchInFirestore,
-  recordRemindersBatchInFirestore,
-  saveConfigToFirestore,
-  saveMemberToFirestore,
-  subscribeOwnerConfig,
-  subscribeOwnerMembers,
-  subscribeOwnerPayments,
-  subscribeOwnerReminders,
-} from './services/libraryFirestore';
-import { ErrorBoundary } from './components/ErrorBoundary';
-import { DashboardView } from './components/DashboardView';
-import { MembersSheetView } from './components/MembersSheetView';
-import { MemberEntryView } from './components/MemberEntryView';
-import { RemindersView } from './components/RemindersView';
-import { PaymentsView } from './components/PaymentsView';
-import { DailyReportView } from './components/DailyReportView';
-import { AutomationGuideView } from './components/AutomationGuideView';
-
-const NAV_ITEMS: Array<{
-  id: AppView;
-  label: string;
-  breadcrumb: string;
-  icon: React.ComponentType<{ className?: string }>;
-}> = [
-  { id: 'dashboard', label: '01. Dashboard', breadcrumb: 'Dashboard', icon: LayoutDashboard },
-  { id: 'members', label: '02. Members Sheet', breadcrumb: 'Members Sheet', icon: Table2 },
-  { id: 'entry', label: '03. Member Entry', breadcrumb: 'Member Entry', icon: UserPlus },
-  { id: 'reminders', label: '04. Expiry Reminders', breadcrumb: 'Expiry Reminders', icon: BellRing },
-  { id: 'payments', label: '05. Payment Update', breadcrumb: 'Payment Update', icon: CreditCard },
-  { id: 'report', label: '06. Daily Report', breadcrumb: 'Daily Report', icon: FileBarChart },
-  { id: 'guide', label: '07. n8n Setup Guide', breadcrumb: 'n8n Setup Guide', icon: Workflow },
-];
-
-const DEFAULT_CONFIG: LibraryConfig = {
-  ownerId: 'local-preview',
-  libraryName: 'My Study Library',
-  ownerEmail: '',
-  ownerPhone: '',
-  totalSeats: 80,
-  completedSteps: [],
-};
-
-function LibraryDeskWorkspace() {
-  const [activeView, setActiveView] = useState<AppView>('dashboard');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isDark, setIsDark] = useState(false);
-
-  const [user, setUser] = useState<User | null>(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [isDataLoading, setIsDataLoading] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const [members, setMembers] = useState<LibraryMember[]>(() =>
-    buildSampleMembers('local-preview')
-  );
-  const [payments, setPayments] = useState<PaymentRecord[]>(() =>
-    buildSamplePayments('local-preview')
-  );
-  const [reminders, setReminders] = useState<ReminderLog[]>(() =>
-    buildSampleReminders()
-  );
-  const [config, setConfig] = useState<LibraryConfig>(DEFAULT_CONFIG);
-
-  // Sync Tailwind dark mode class
-  useEffect(() => {
-    const root = document.documentElement;
-    if (isDark) {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-  }, [isDark]);
-
-  // Listen to Firebase Auth state & attach Firestore subscriptions only when signed in
-  useEffect(() => {
-    let unsubMembers: (() => void) | undefined;
-    let unsubPayments: (() => void) | undefined;
-    let unsubReminders: (() => void) | undefined;
-    let unsubConfig: (() => void) | undefined;
-    let cancelled = false;
-
-    const cleanupSubs = () => {
-      unsubMembers?.();
-      unsubPayments?.();
-      unsubReminders?.();
-      unsubConfig?.();
-      unsubMembers = undefined;
-      unsubPayments = undefined;
-      unsubReminders = undefined;
-      unsubConfig = undefined;
-    };
-
-    const unsubAuth = onAuthStateChanged(auth, async (nextUser) => {
-      cleanupSubs();
-      setAuthError(null);
-      setActionError(null);
-
-      if (!nextUser) {
-        setUser(null);
-        setMembers(buildSampleMembers('local-preview'));
-        setPayments(buildSamplePayments('local-preview'));
-        setReminders(buildSampleReminders());
-        setConfig(DEFAULT_CONFIG);
-        setIsDataLoading(false);
-        setAuthReady(true);
-        return;
-      }
-
-      if (!nextUser.emailVerified) {
-        setUser(nextUser);
-        setAuthError('Please verify your Google account email to enable Cloud Firestore sync.');
-        setIsDataLoading(false);
-        setAuthReady(true);
-        return;
-      }
-
-      setUser(nextUser);
-      setIsDataLoading(true);
-      try {
-        await ensureOwnerWorkspace(nextUser);
-        if (cancelled) return;
-
-        unsubMembers = subscribeOwnerMembers(nextUser.uid, (list) => {
-          setMembers(list);
-          setIsDataLoading(false);
-        });
-        unsubPayments = subscribeOwnerPayments(nextUser.uid, (list) => {
-          setPayments(list);
-        });
-        unsubReminders = subscribeOwnerReminders(nextUser.uid, (list) => {
-          setReminders(list);
-        });
-        unsubConfig = subscribeOwnerConfig(nextUser.uid, (cfg) => {
-          setConfig(cfg);
-        });
-      } catch (err) {
-        setIsDataLoading(false);
-        setActionError(err instanceof Error ? err.message : 'Could not load cloud workspace.');
-      } finally {
-        if (!cancelled) setAuthReady(true);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      cleanupSubs();
-      unsubAuth();
-    };
-  }, []);
-
-  const handleSignIn = async () => {
-    setAuthError(null);
-    try {
-      await googleSignIn();
-    } catch (err) {
-      setAuthError(
-        err instanceof Error ? err.message : 'Google Sign-In was cancelled or failed.'
-      );
-    }
-  };
-
-  const handleSignOut = async () => {
-    setAuthError(null);
-    await logoutGoogle();
-  };
-
-  const isCloudSynced = Boolean(user && user.emailVerified);
-  const activeOwnerId = isCloudSynced && user ? user.uid : 'local-preview';
-
-  const handleSaveMember = async (member: LibraryMember, isUpdate: boolean) => {
-    setActionError(null);
-    if (isCloudSynced && user) {
-      await saveMemberToFirestore(user.uid, member, isUpdate);
-      return;
-    }
-
-    setMembers((prev) => {
-      const exists = prev.some((m) => m.docId === member.docId);
-      if (exists) {
-        return prev.map((m) => (m.docId === member.docId ? member : m));
-      }
-      return [...prev, member];
-    });
-  };
-
-  const handleDeleteMember = async (docId: string) => {
-    setActionError(null);
-    if (isCloudSynced && user) {
-      await deleteMemberFromFirestore(user.uid, docId);
-      return;
-    }
-    setMembers((prev) => prev.filter((m) => m.docId !== docId));
-  };
-
-  const handleRunReminderBatch = async (
-    eligible: Array<{ member: LibraryMember; daysLeft: number }>
-  ) => {
-    if (eligible.length === 0) return;
-    setActionError(null);
-    const today = getTodayKolkataIso();
-
-    const batchItems = eligible.map(({ member, daysLeft }) => {
-      const msg = buildWhatsAppReminderText(
-        member.name,
-        member.expiry_date,
-        config.libraryName
-      );
-      const log: ReminderLog = {
-        reminder_id: `rem_${Date.now()}_${member.member_id}`,
-        ownerId: activeOwnerId,
-        member_id: member.member_id,
-        member_name: member.name,
-        phone: member.phone,
-        expiry_date: member.expiry_date,
-        days_left: daysLeft,
-        message_preview: msg,
-        sent_date: today,
-        status: isCloudSynced ? 'Sent' : 'Simulated',
-      };
-      return { member, log };
-    });
-
-    if (isCloudSynced && user) {
-      await recordRemindersBatchInFirestore(user.uid, batchItems);
-      return;
-    }
-
-    const updatedIds = new Set(batchItems.map((i) => i.member.docId));
-    setMembers((prev) =>
-      prev.map((m) =>
-        updatedIds.has(m.docId) ? { ...m, last_reminder_date: today } : m
-      )
-    );
-    setReminders((prev) => [...batchItems.map((i) => i.log), ...prev]);
-  };
-
-  const handleQuickSendReminder = async (member: LibraryMember) => {
-    const today = getTodayKolkataIso();
-    if (member.last_reminder_date === today) return;
-    const daysLeft = computeDaysLeft(member.expiry_date, today);
-    await handleRunReminderBatch([{ member, daysLeft }]);
-  };
-
-  const handleRecordPayment = async (
-    member: LibraryMember,
-    amount: number,
-    mode: PaymentMode,
-    linkId: string
-  ): Promise<{ skipped: boolean; newExpiry: string }> => {
-    setActionError(null);
-    const today = getTodayKolkataIso();
-
-    // Idempotency guard from Chapter 6 (Workflow 3)
-    if (member.last_payment_ref && member.last_payment_ref === linkId) {
-      return { skipped: true, newExpiry: member.expiry_date };
-    }
-
-    const newExpiry = computeNextExpiryAfterPayment(member, today);
-    const payment: PaymentRecord = {
-      payment_id: `pay_${Date.now()}_${member.member_id}`,
-      ownerId: activeOwnerId,
-      member_doc_id: member.docId,
-      member_id: member.member_id,
-      member_name: member.name,
-      amount: Math.max(0, Number(amount) || 0),
-      mode,
-      link_id: linkId,
-      payment_date: today,
-      previous_expiry: member.expiry_date,
-      new_expiry: newExpiry,
-    };
-
-    if (isCloudSynced && user) {
-      await recordPaymentBatchInFirestore(user.uid, member, payment, newExpiry);
-      return { skipped: false, newExpiry };
-    }
-
-    setMembers((prev) =>
-      prev.map((m) =>
-        m.docId === member.docId
-          ? {
-              ...m,
-              payment_status: 'Paid',
-              last_payment_date: today,
-              expiry_date: newExpiry,
-              last_payment_ref: linkId,
-            }
-          : m
-      )
-    );
-    setPayments((prev) => [payment, ...prev]);
-    return { skipped: false, newExpiry };
-  };
-
-  const handleUpdateConfig = async (nextConfig: LibraryConfig) => {
-    setActionError(null);
-    if (isCloudSynced && user) {
-      await saveConfigToFirestore(user.uid, nextConfig);
-      return;
-    }
-    setConfig(nextConfig);
-  };
-
-  const handleToggleStep = async (stepId: string) => {
-    const exists = config.completedSteps.includes(stepId);
-    const nextSteps = exists
-      ? config.completedSteps.filter((id) => id !== stepId)
-      : [...config.completedSteps, stepId];
-    await handleUpdateConfig({
-      ...config,
-      completedSteps: nextSteps,
-    });
-  };
-
-  const activeNavItem =
-    NAV_ITEMS.find((n) => n.id === activeView) || NAV_ITEMS[0];
-
-  const handleSelectNav = (id: AppView) => {
-    setActiveView(id);
-    setMobileMenuOpen(false);
-  };
-
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full justify-between">
-      <div className="space-y-6">
-        {/* Brand Header */}
-        <div className="px-4 pt-5 pb-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
-              <BookOpen className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-sm font-bold text-slate-900 dark:text-white font-['Outfit'] truncate">
-                Library Desk
-              </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                {config.libraryName}
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(false)}
-            className="lg:hidden p-1 rounded text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer"
-            aria-label="Close navigation menu"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Navigation Links */}
-        <nav className="px-3 space-y-1" aria-label="Primary Sidebar Navigation">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const active = activeView === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleSelectNav(item.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left ${
-                  active
-                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 font-semibold'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span className="truncate">{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
-
-      {/* Bottom Workspace Sync Card */}
-      <div className="p-3 border-t border-slate-200 dark:border-slate-800 space-y-2.5">
-        <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1.5">
-          <div className="text-[11px] font-semibold text-slate-800 dark:text-slate-200">
-            {isCloudSynced ? 'Cloud Firestore Synced' : 'Local Preview Mode'}
-          </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-            {isCloudSynced
-              ? `Signed in as ${user?.email || 'Library Owner'}`
-              : 'Sign in with Google to save members, payments, and checklist permanently.'}
-          </p>
-        </div>
-
-        {isCloudSynced ? (
-          <button
-            type="button"
-            onClick={handleSignOut}
-            className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={handleSignIn}
-            disabled={!authReady}
-            className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer"
-          >
-            <LogIn className="w-3.5 h-3.5" />
-            <span>Sign in with Google</span>
-          </button>
-        )}
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex">
-      {/* Desktop Sidebar (240px) */}
-      <aside className="hidden lg:block w-60 shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 sticky top-0 h-screen">
-        <SidebarContent />
-      </aside>
-
-      {/* Mobile Drawer */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex">
-          <div
-            className="fixed inset-0 bg-slate-950/50"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-          <aside className="relative w-64 max-w-[80vw] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 h-full z-10">
-            <SidebarContent />
-          </aside>
-        </div>
-      )}
-
-      {/* Main Content Area */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        {/* Top Bar Contract: Breadcrumb Left — Actions Right */}
-        <header className="sticky top-0 z-30 h-14 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
-              aria-label="Open navigation menu"
-            >
-              <Menu className="w-4 h-4" />
-            </button>
-            <div className="flex items-center gap-2 text-xs truncate">
-              <span className="font-semibold text-slate-900 dark:text-white whitespace-nowrap">
-                Library Desk
-              </span>
-              <span className="text-slate-400" aria-hidden="true">/</span>
-              <span className="text-slate-600 dark:text-slate-300 font-medium truncate">
-                {activeNavItem.breadcrumb}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsDark((prev) => !prev)}
-              className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              title={isDark ? 'Light Mode' : 'Dark Mode'}
-            >
-              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
-
-            {!isCloudSynced && (
-              <button
-                type="button"
-                onClick={handleSignIn}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap shrink-0"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Sync Cloud</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setActiveView('entry')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>New Member</span>
-            </button>
-          </div>
-        </header>
-
-        {/* Main Viewport */}
-        <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto space-y-5">
-          {(authError || actionError) && (
-            <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-800 dark:text-rose-300 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{authError || actionError}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthError(null);
-                  setActionError(null);
-                }}
-                className="text-xs font-semibold underline cursor-pointer shrink-0"
-              >
-                Dismiss
-              </button>
-            </div>
-          )}
-
-          {activeView === 'dashboard' && (
-            <DashboardView
-              members={members}
-              payments={payments}
-              config={config}
-              isLoading={isDataLoading}
-              onNavigate={setActiveView}
-              onUpdateConfig={handleUpdateConfig}
-              onQuickSendReminder={handleQuickSendReminder}
-            />
-          )}
-
-          {activeView === 'members' && (
-            <MembersSheetView
-              members={members}
-              onSaveMember={handleSaveMember}
-              onDeleteMember={handleDeleteMember}
-              onNavigateToEntry={() => setActiveView('entry')}
-            />
-          )}
-
-          {activeView === 'entry' && (
-            <MemberEntryView
-              ownerId={activeOwnerId}
-              members={members}
-              onSaveMember={handleSaveMember}
-            />
-          )}
-
-          {activeView === 'reminders' && (
-            <RemindersView
-              members={members}
-              reminders={reminders}
-              libraryName={config.libraryName}
-              onRunReminderBatch={handleRunReminderBatch}
-            />
-          )}
-
-          {activeView === 'payments' && (
-            <PaymentsView
-              members={members}
-              payments={payments}
-              onRecordPayment={handleRecordPayment}
-            />
-          )}
-
-          {activeView === 'report' && (
-            <DailyReportView members={members} config={config} />
-          )}
-
-          {activeView === 'guide' && (
-            <AutomationGuideView
-              completedSteps={config.completedSteps}
-              onToggleStep={handleToggleStep}
-            />
-          )}
-        </main>
-      </div>
-    </div>
-  );
-}
+import { FullRRBDatabase, TabView } from './types';
+import { loadRRBDatabase, saveRRBDatabase, exportEmptySchemaJson } from './utils/storage';
+import { checkAdminSession, logoutAdmin } from './utils/auth';
+import { TopGovBar } from './components/TopGovBar';
+import { Navbar } from './components/Navbar';
+import { HomeDashboard } from './components/HomeDashboard';
+import { ExamsSection } from './components/ExamsSection';
+import { CutoffSection } from './components/CutoffSection';
+import { NoticesSection } from './components/NoticesSection';
+import { ResultsSection } from './components/ResultsSection';
+import { AdminPanel } from './components/AdminPanel';
+import { AdminLogin } from './components/AdminLogin';
+import { GlobalSearchModal } from './components/GlobalSearchModal';
+import { NotificationToastContainer } from './components/NotificationToastContainer';
+import { NotificationCenterModal } from './components/NotificationCenterModal';
+import { MobileBottomNav } from './components/MobileBottomNav';
+import { FloatingAIAvatar } from './components/FloatingAIAvatar';
+import { RRBAIAssistantModal } from './components/RRBAIAssistantModal';
+import { RailwayLogo } from './components/RailwayLogo';
 
 export default function App() {
+  const [database, setDatabase] = useState<FullRRBDatabase>(loadRRBDatabase);
+  const [currentTab, setCurrentTab] = useState<TabView>('home');
+  const [selectedZoneFilter, setSelectedZoneFilter] = useState<string>('ALL');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(checkAdminSession);
+  const [language, setLanguage] = useState<'hi' | 'en'>('hi');
+  const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('base');
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Sync state to local storage if updated
+  useEffect(() => {
+    saveRRBDatabase(database);
+  }, [database]);
+
+  // Navigate helper from search/notification modal
+  const handleNavigate = (tab: TabView) => {
+    setCurrentTab(tab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleAdminLogout = () => {
+    logoutAdmin();
+    setIsAdminAuthenticated(false);
+  };
+
+  const fontSizeClass = fontSize === 'lg' ? 'text-[17px]' : fontSize === 'sm' ? 'text-[14px]' : 'text-[15px]';
+
   return (
-    <ErrorBoundary>
-      <LibraryDeskWorkspace />
-    </ErrorBoundary>
+    <div className={`min-h-screen bg-[#f4f6f9] flex flex-col font-sans text-slate-900 selection:bg-[#c1121f] selection:text-white ${fontSizeClass}`}>
+      {/* 1. Official Government of India Top Header Bar */}
+      <TopGovBar
+        currentLanguage={language}
+        onLanguageChange={setLanguage}
+        fontSize={fontSize}
+        onFontSizeChange={setFontSize}
+        isDarkMode={isDarkMode}
+        onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+      />
+
+      {/* 2. Main Navigation Bar with RRB SMART PORTAL Branding */}
+      <Navbar
+        currentTab={currentTab}
+        setCurrentTab={setCurrentTab}
+        database={database}
+        selectedZoneFilter={selectedZoneFilter}
+        setSelectedZoneFilter={setSelectedZoneFilter}
+        onOpenSearch={() => setIsSearchOpen(true)}
+        onOpenNotifications={() => setIsNotificationOpen(true)}
+        onOpenAIModal={() => setIsAIModalOpen(true)}
+        isAdminAuthenticated={isAdminAuthenticated}
+        onAdminLogout={handleAdminLogout}
+      />
+
+      {/* 3. Main Content Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-12">
+        {currentTab === 'home' && (
+          <HomeDashboard
+            database={database}
+            setCurrentTab={setCurrentTab}
+            selectedZoneFilter={selectedZoneFilter}
+            setSelectedZoneFilter={setSelectedZoneFilter}
+            onOpenGlobalSearch={() => setIsSearchOpen(true)}
+            isAIModalOpen={isAIModalOpen}
+            onCloseAIModal={() => setIsAIModalOpen(false)}
+            onOpenAIModal={() => setIsAIModalOpen(true)}
+          />
+        )}
+
+        {currentTab === 'exams' && (
+          <ExamsSection
+            exams={database.exams}
+            setCurrentTab={setCurrentTab}
+          />
+        )}
+
+        {currentTab === 'cutoffs' && (
+          <CutoffSection
+            database={database}
+            selectedZoneFilter={selectedZoneFilter}
+            setSelectedZoneFilter={setSelectedZoneFilter}
+            setCurrentTab={setCurrentTab}
+          />
+        )}
+
+        {currentTab === 'notices' && (
+          <NoticesSection
+            database={database}
+            selectedZoneFilter={selectedZoneFilter}
+            setSelectedZoneFilter={setSelectedZoneFilter}
+            setCurrentTab={setCurrentTab}
+          />
+        )}
+
+        {currentTab === 'results' && (
+          <ResultsSection
+            database={database}
+            selectedZoneFilter={selectedZoneFilter}
+            setSelectedZoneFilter={setSelectedZoneFilter}
+            setCurrentTab={setCurrentTab}
+          />
+        )}
+
+        {currentTab === 'admin' && (
+          !isAdminAuthenticated ? (
+            <AdminLogin
+              onSuccess={() => setIsAdminAuthenticated(true)}
+              onCancel={() => setCurrentTab('home')}
+            />
+          ) : (
+            <AdminPanel
+              database={database}
+              setDatabase={setDatabase}
+              setCurrentTab={setCurrentTab}
+              onLogout={handleAdminLogout}
+            />
+          )
+        )}
+      </main>
+
+      {/* Global Universal Search Modal */}
+      <GlobalSearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        database={database}
+        onNavigate={handleNavigate}
+      />
+
+      {/* Real-time Notification Center Modal & Drawer */}
+      <NotificationCenterModal
+        isOpen={isNotificationOpen}
+        onClose={() => setIsNotificationOpen(false)}
+        onNavigate={handleNavigate}
+        zones={database.zones}
+      />
+
+      {/* Floating In-App Live Notification Toasts */}
+      <NotificationToastContainer onNavigate={handleNavigate} />
+
+      {/* Floating Bottom-Right RRB AI Avatar Button */}
+      <FloatingAIAvatar onClick={() => setIsAIModalOpen(true)} />
+
+      {/* Global RRB AI Assistant Dialog */}
+      <RRBAIAssistantModal
+        isOpen={isAIModalOpen}
+        onClose={() => setIsAIModalOpen(false)}
+      />
+
+      {/* Official Government of India / RRB Footer */}
+      <footer className="bg-[#0b1329] border-t border-slate-800 text-slate-400 text-xs mt-auto pb-16 md:pb-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+            {/* Col 1: Portal Summary */}
+            <div className="space-y-3 md:col-span-2">
+              <div className="flex items-center space-x-3 text-white font-bold text-base">
+                <RailwayLogo size="sm" />
+                <span>RRB SMART PORTAL • Your Journey to a Government Career</span>
+              </div>
+              <p className="text-slate-400 leading-relaxed text-xs max-w-md">
+                Official Information System for Centralized Employment Notifications (CEN), qualifying cut-off score tracking, candidate merit lists, and 21 regional board portals.
+              </p>
+              <div className="flex items-center space-x-2 text-[11px] text-amber-400/90 font-medium">
+                <ShieldCheck className="w-4 h-4 text-amber-400" />
+                <span>100% Authentic Official Data Guarantee</span>
+              </div>
+            </div>
+
+            {/* Col 2: Quick Links */}
+            <div>
+              <h4 className="font-bold text-white uppercase tracking-wider text-xs mb-3">
+                Quick Navigation
+              </h4>
+              <ul className="space-y-2 text-xs">
+                <li>
+                  <button
+                    onClick={() => setCurrentTab('exams')}
+                    className="hover:text-amber-400 transition-colors"
+                  >
+                    Active CEN Exams ({database.exams.length})
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => setCurrentTab('cutoffs')}
+                    className="hover:text-amber-400 transition-colors"
+                  >
+                    Cut-Off Marks Table ({database.cutoffs.length})
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => setCurrentTab('notices')}
+                    className="hover:text-amber-400 transition-colors"
+                  >
+                    Employment Notices ({database.notices.length})
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => setCurrentTab('results')}
+                    className="hover:text-amber-400 transition-colors"
+                  >
+                    Results & Merit Panels ({database.results.length})
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => setIsAIModalOpen(true)}
+                    className="hover:text-cyan-400 transition-colors font-bold text-cyan-400 flex items-center space-x-1"
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-400" />
+                    <span>Ask RRB AI Assistant</span>
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            {/* Col 3: Data Management & Schema */}
+            <div>
+              <h4 className="font-bold text-white uppercase tracking-wider text-xs mb-3">
+                Data Hub Utilities
+              </h4>
+              <ul className="space-y-2 text-xs">
+                <li>
+                  <button
+                    onClick={() => exportEmptySchemaJson()}
+                    className="hover:text-amber-400 transition-colors flex items-center space-x-1"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download Blank Schema (.json)</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => setCurrentTab('admin')}
+                    className="hover:text-amber-400 transition-colors flex items-center space-x-1"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload Official CEN Data</span>
+                  </button>
+                </li>
+                <li>
+                  <a
+                    href="https://indianrailways.gov.in"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="hover:text-amber-400 transition-colors flex items-center space-x-1"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Ministry of Railways</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Bottom Copyright & Disclaimer */}
+          <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-3">
+            <div>
+              © {new Date().getFullYear()} RRB SMART PORTAL • Developed for official CEN record administration.
+            </div>
+            <div className="text-slate-400">
+              AI-Powered Indian Railways Information Hub
+            </div>
+          </div>
+        </div>
+      </footer>
+
+      {/* Mobile Sticky Bottom Nav with AI button */}
+      <MobileBottomNav
+        currentTab={currentTab}
+        setCurrentTab={setCurrentTab}
+        onOpenAIModal={() => setIsAIModalOpen(true)}
+      />
+    </div>
   );
 }
