@@ -10,7 +10,6 @@ import { CutOffTablePreview } from './CutOffTablePreview';
 import { RRBZonesWidget } from './RRBZonesWidget';
 import { TrustBadgesStrip } from './TrustBadgesStrip';
 import { ExamDetailModal } from './ExamDetailModal';
-import { RRBAIAssistantModal } from './RRBAIAssistantModal';
 import { StudyMaterialModal } from './StudyMaterialModal';
 
 interface HomeDashboardProps {
@@ -19,9 +18,6 @@ interface HomeDashboardProps {
   selectedZoneFilter: string;
   setSelectedZoneFilter: (zone: string) => void;
   onOpenGlobalSearch?: () => void;
-  isAIModalOpen?: boolean;
-  onCloseAIModal?: () => void;
-  onOpenAIModal?: () => void;
 }
 
 export const HomeDashboard: React.FC<HomeDashboardProps> = ({
@@ -30,14 +26,9 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   selectedZoneFilter,
   setSelectedZoneFilter,
   onOpenGlobalSearch,
-  isAIModalOpen = false,
-  onCloseAIModal,
-  onOpenAIModal,
 }) => {
   const [selectedExamForModal, setSelectedExamForModal] = useState<ExamItem | null>(null);
   const [studyMaterialModalOpen, setStudyMaterialModalOpen] = useState(false);
-  const [activeAIPrompt, setActiveAIPrompt] = useState<string | undefined>(undefined);
-  const [localAIModalOpen, setLocalAIModalOpen] = useState(false);
 
   const [cutoffFilters, setCutoffFilters] = useState<{
     examId?: string;
@@ -60,25 +51,9 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     }
   };
 
-  const handleOpenAIPrompt = (prompt: string) => {
-    setActiveAIPrompt(prompt);
-    if (onOpenAIModal) {
-      onOpenAIModal();
-    } else {
-      setLocalAIModalOpen(true);
-    }
-  };
-
-  const isModalVisible = isAIModalOpen || localAIModalOpen;
-  const handleCloseAI = () => {
-    if (onCloseAIModal) onCloseAIModal();
-    setLocalAIModalOpen(false);
-    setActiveAIPrompt(undefined);
-  };
-
   return (
     <div className="space-y-6 sm:space-y-8 pb-10">
-      {/* 1. Indian Railways Locomotive Train Hero Banner with Ask RRB AI Widget */}
+      {/* 1. Indian Railways Locomotive Train Hero Banner */}
       <RailwayTrainHeroBanner
         onSearchSubmit={(query) => {
           if (onOpenGlobalSearch) onOpenGlobalSearch();
@@ -89,7 +64,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
           if (match) setSelectedExamForModal(match);
           else setCurrentTab('exams');
         }}
-        onOpenAIWithPrompt={handleOpenAIPrompt}
+        onNavigateTab={(tab) => setCurrentTab(tab)}
       />
 
       {/* 2. Quick Access Row (6 Cards: Latest Exams, Notifications, Cut Off, Results, Answer Key, Study Material) */}
@@ -147,7 +122,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         </div>
       </div>
 
-      {/* 5. Bottom Trust Badges Strip (100% Trusted, AI Powered, Fast Updates, All in One Place) */}
+      {/* 5. Bottom Trust Badges Strip (100% Trusted, Fast Updates, All in One Place) */}
       <TrustBadgesStrip />
 
       {/* Modal Dialog when an exam is clicked from Home Screen */}
@@ -166,15 +141,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         />
       )}
 
-      {/* RRB AI Assistant Interactive Modal */}
-      {isModalVisible && (
-        <RRBAIAssistantModal
-          isOpen={isModalVisible}
-          onClose={handleCloseAI}
-          initialPrompt={activeAIPrompt}
-        />
-      )}
-
       {/* Study Material Modal */}
       {studyMaterialModalOpen && (
         <StudyMaterialModal
@@ -185,3 +151,4 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     </div>
   );
 };
+

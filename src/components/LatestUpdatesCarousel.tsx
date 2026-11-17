@@ -70,7 +70,7 @@ export const LatestUpdatesCarousel: React.FC<LatestUpdatesCarouselProps> = ({
       {exams.length === 0 ? (
         <div className="py-8 px-4 text-center rounded-2xl bg-slate-50 border border-dashed border-slate-200">
           <p className="text-xs font-bold text-slate-700">No active recruitment drives loaded</p>
-          <p className="text-[11px] text-slate-500 mt-1">Exams and recruitment cards will appear here once added in the Admin Panel.</p>
+          <p className="text-[11px] text-slate-500 mt-1">Exams and recruitment notifications will appear here upon official release.</p>
         </div>
       ) : (
         /* Horizontal Scrollable Carousel Container */

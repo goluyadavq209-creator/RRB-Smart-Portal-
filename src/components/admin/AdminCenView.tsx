@@ -64,48 +64,58 @@ export const AdminCenView: React.FC<AdminCenViewProps> = ({ database, onSuccessM
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {cenList.map((item) => (
-          <div
-            key={item.cen}
-            className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all space-y-3"
-          >
-            <div className="flex items-center justify-between">
-              <span className="px-3 py-1 rounded-lg bg-amber-500/15 text-amber-950 font-mono text-sm font-black border border-amber-500/30">
-                {item.cen}
-              </span>
-              <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
-                Active Batch
-              </span>
-            </div>
+      {cenList.length === 0 ? (
+        <div className="bg-white p-12 rounded-2xl border border-slate-200 shadow-xs text-center space-y-2">
+          <Tag className="w-8 h-8 text-slate-300 mx-auto" />
+          <h3 className="font-bold text-slate-800 text-sm">No CEN Batches Found</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            CEN batches will automatically appear here as exams, cut-offs, or official notices with CEN numbers are published.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {cenList.map((item) => (
+            <div
+              key={item.cen}
+              className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <span className="px-3 py-1 rounded-lg bg-amber-500/15 text-amber-950 font-mono text-sm font-black border border-amber-500/30">
+                  {item.cen}
+                </span>
+                <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                  Active Batch
+                </span>
+              </div>
 
-            <div className="grid grid-cols-3 gap-2 text-center pt-2">
-              <div className="p-2.5 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-slate-400 block font-bold">Exams</span>
-                <span className="text-sm font-extrabold text-slate-900">{item.examsCount}</span>
+              <div className="grid grid-cols-3 gap-2 text-center pt-2">
+                <div className="p-2.5 bg-slate-50 rounded-xl">
+                  <span className="text-[10px] text-slate-400 block font-bold">Exams</span>
+                  <span className="text-sm font-extrabold text-slate-900">{item.examsCount}</span>
+                </div>
+                <div className="p-2.5 bg-slate-50 rounded-xl">
+                  <span className="text-[10px] text-slate-400 block font-bold">Cut-offs</span>
+                  <span className="text-sm font-extrabold text-slate-900">{item.cutoffsCount}</span>
+                </div>
+                <div className="p-2.5 bg-slate-50 rounded-xl">
+                  <span className="text-[10px] text-slate-400 block font-bold">Notices</span>
+                  <span className="text-sm font-extrabold text-slate-900">{item.noticesCount}</span>
+                </div>
               </div>
-              <div className="p-2.5 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-slate-400 block font-bold">Cut-offs</span>
-                <span className="text-sm font-extrabold text-slate-900">{item.cutoffsCount}</span>
-              </div>
-              <div className="p-2.5 bg-slate-50 rounded-xl">
-                <span className="text-[10px] text-slate-400 block font-bold">Notices</span>
-                <span className="text-sm font-extrabold text-slate-900">{item.noticesCount}</span>
-              </div>
-            </div>
 
-            <div className="pt-2 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100">
-              <span>Status: Synchronized</span>
-              <button
-                onClick={() => onSuccessMessage(`Filtered active records for ${item.cen}`)}
-                className="text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
-              >
-                View Batch
-              </button>
+              <div className="pt-2 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100">
+                <span>Status: Synchronized</span>
+                <button
+                  onClick={() => onSuccessMessage(`Filtered active records for ${item.cen}`)}
+                  className="text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
+                >
+                  View Batch
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

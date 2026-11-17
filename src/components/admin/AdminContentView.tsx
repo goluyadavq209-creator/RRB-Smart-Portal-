@@ -88,39 +88,46 @@ export const AdminContentView: React.FC<AdminContentViewProps> = ({ database, on
           </button>
         </div>
 
-        <div className="space-y-2.5">
-          {links.map((link) => (
-            <div
-              key={link.id}
-              className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
-            >
-              <div>
-                <div className="flex items-center space-x-2">
-                  <span className="font-bold text-slate-900">{link.title}</span>
-                  <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200">
-                    {link.badgeText || 'Official'}
-                  </span>
-                </div>
-                <a
-                  href={link.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-blue-600 hover:underline flex items-center space-x-1 mt-1 text-[11px] font-mono"
-                >
-                  <span>{link.url}</span>
-                  <ExternalLink className="w-3 h-3 shrink-0" />
-                </a>
-              </div>
-
-              <button
-                onClick={() => handleDelete(link.id)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 cursor-pointer"
+        {links.length === 0 ? (
+          <div className="py-8 text-center text-slate-400 text-xs">
+            <Globe className="w-6 h-6 mx-auto mb-1.5 text-slate-300" />
+            <span>No portal links registered yet. Click "Add Official Link" above to publish links.</span>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {links.filter(Boolean).map((link) => (
+              <div
+                key={link.id}
+                className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
               >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-        </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-bold text-slate-900">{link.title || 'Untitled Link'}</span>
+                    <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200">
+                      {link.badgeText || 'Official'}
+                    </span>
+                  </div>
+                  <a
+                    href={link.url || '#'}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-600 hover:underline flex items-center space-x-1 mt-1 text-[11px] font-mono"
+                  >
+                    <span>{link.url || 'No URL'}</span>
+                    <ExternalLink className="w-3 h-3 shrink-0" />
+                  </a>
+                </div>
+
+                <button
+                  onClick={() => handleDelete(link.id)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {showModal && (

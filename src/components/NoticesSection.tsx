@@ -165,21 +165,33 @@ export const NoticesSection: React.FC<NoticesSectionProps> = ({
             <Bell className="w-7 h-7" />
           </div>
           <h3 className="font-bold text-base sm:text-lg text-slate-900">
-            {database.notices.length === 0 ? 'Zero Notices Uploaded' : 'No Notices Match Your Search'}
+            {database.notices.length === 0 ? 'No Active Notices Published' : 'No Notices Match Your Search'}
           </h3>
           <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1">
             {database.notices.length === 0
-              ? 'Zero fake data is assumed. Upload your verified RRB notifications via JSON in Admin Panel.'
+              ? 'Official circulars, corrigendums, and exam schedules will be listed here as released by the Railway Recruitment Boards.'
               : 'Try resetting the category filter or searching with different terms.'}
           </p>
 
-          <div className="mt-5 flex justify-center gap-3">
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
             <button
               onClick={() => setCurrentTab('admin')}
               className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-xs"
             >
               Open Admin Panel
             </button>
+            {(searchQuery || selectedCategory !== 'ALL' || selectedZoneFilter !== 'ALL') && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('ALL');
+                  setSelectedZoneFilter('ALL');
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm transition-all cursor-pointer"
+              >
+                Reset Filters
+              </button>
+            )}
           </div>
         </div>
       ) : (

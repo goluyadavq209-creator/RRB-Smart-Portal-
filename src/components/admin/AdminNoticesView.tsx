@@ -112,46 +112,63 @@ export const AdminNoticesView: React.FC<AdminNoticesViewProps> = ({ database, se
       </div>
 
       <div className="space-y-3">
-        {filteredNotices.map((notice) => (
-          <div
-            key={notice.id}
-            className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-          >
-            <div className="space-y-1.5 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                {notice.cenNumber && (
-                  <span className="px-2 py-0.5 rounded bg-slate-900 text-amber-400 font-mono text-[11px] font-bold">
-                    {notice.cenNumber}
+        {filteredNotices.length === 0 ? (
+          <div className="bg-white p-12 rounded-2xl border border-slate-200 shadow-xs text-center space-y-3">
+            <Bell className="w-9 h-9 text-slate-300 mx-auto" />
+            <h3 className="font-bold text-slate-800 text-sm">No Notices Published</h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              There are no official notices or circulars in the database right now. Click "Add New Notice" to issue a circular.
+            </p>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-xs inline-flex items-center space-x-1.5 cursor-pointer mt-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create First Notice</span>
+            </button>
+          </div>
+        ) : (
+          filteredNotices.map((notice) => (
+            <div
+              key={notice.id}
+              className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+            >
+              <div className="space-y-1.5 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  {notice.cenNumber && (
+                    <span className="px-2 py-0.5 rounded bg-slate-900 text-amber-400 font-mono text-[11px] font-bold">
+                      {notice.cenNumber}
+                    </span>
+                  )}
+                  <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200">
+                    {notice.category}
                   </span>
+                  {notice.isImportant && (
+                    <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-extrabold uppercase">
+                      Important
+                    </span>
+                  )}
+                  <span className="text-[11px] text-slate-400 font-medium">📅 {notice.publishDate}</span>
+                </div>
+
+                <h3 className="font-bold text-sm text-slate-900">{notice.title}</h3>
+                {notice.contentSummary && (
+                  <p className="text-xs text-slate-500 line-clamp-2">{notice.contentSummary}</p>
                 )}
-                <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200">
-                  {notice.category}
-                </span>
-                {notice.isImportant && (
-                  <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-extrabold uppercase">
-                    Important
-                  </span>
-                )}
-                <span className="text-[11px] text-slate-400 font-medium">📅 {notice.publishDate}</span>
               </div>
 
-              <h3 className="font-bold text-sm text-slate-900">{notice.title}</h3>
-              {notice.contentSummary && (
-                <p className="text-xs text-slate-500 line-clamp-2">{notice.contentSummary}</p>
-              )}
+              <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center">
+                <button
+                  onClick={() => handleDelete(notice.id, notice.title)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                  title="Delete notice"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-
-            <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center">
-              <button
-                onClick={() => handleDelete(notice.id, notice.title)}
-                className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
-                title="Delete notice"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       {/* Add Modal */}

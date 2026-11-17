@@ -27,16 +27,18 @@ export const CandidateDirectLinksHub: React.FC<CandidateDirectLinksHubProps> = (
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<'all' | PortalLinkType>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const links = database.portalLinks || [];
-  const activeLinks = links.filter((l) => l.isActive);
+  const links = Array.isArray(database?.portalLinks) ? database.portalLinks : [];
+  const activeLinks = links.filter((l) => l && l.isActive);
 
   const filteredLinks = selectedTypeFilter === 'all'
     ? activeLinks
-    : activeLinks.filter((l) => l.type === selectedTypeFilter);
+    : activeLinks.filter((l) => l && l.type === selectedTypeFilter);
 
   const handleCopy = (id: string, url: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(url);
+    if (url) {
+      navigator.clipboard.writeText(url);
+    }
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
@@ -240,7 +242,11 @@ export const CandidateDirectLinksHub: React.FC<CandidateDirectLinksHubProps> = (
             return (
               <div
                 key={item.id}
-                onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
+                onClick={() => {
+                  if (item?.url) {
+                    window.open(item.url, '_blank', 'noopener,noreferrer');
+                  }
+                }}
                 className={`p-4 sm:p-5 rounded-2xl border ${theme.borderColor} ${theme.bgLight} hover:bg-white transition-all duration-200 flex flex-col justify-between group shadow-xs hover:shadow-md cursor-pointer relative`}
               >
                 <div>
@@ -294,7 +300,7 @@ export const CandidateDirectLinksHub: React.FC<CandidateDirectLinksHubProps> = (
                 <div className="mt-4 pt-3 border-t border-slate-200/80 flex items-center justify-between gap-2">
                   <button
                     type="button"
-                    onClick={(e) => handleCopy(item.id, item.url, e)}
+                    onClick={(e) => handleCopy(item.id, item?.url || '', e)}
                     className="inline-flex items-center space-x-1 px-2.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs transition-colors cursor-pointer shrink-0"
                     title="Copy direct portal link"
                   >

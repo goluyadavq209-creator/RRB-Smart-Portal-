@@ -136,11 +136,12 @@ export const AdminDataRemove: React.FC<AdminDataRemoveProps> = ({
 
     if (selectedType === 'all' || selectedType === 'links') {
       portalLinks.forEach((l) => {
+        if (!l) return;
         list.push({
           type: 'links',
           id: l.id,
-          title: l.title,
-          subtitle: `${l.type.toUpperCase()} • ${l.examName || 'All Exams'} • ${l.url}`,
+          title: l.title || 'Untitled Link',
+          subtitle: `${(l.type || 'PORTAL').toUpperCase()} • ${l.examName || 'All Exams'} • ${l.url || ''}`,
           cen: l.cenNumber || '',
         });
       });

@@ -2,12 +2,23 @@ import React, { useState } from 'react';
 import { ScrollText, ShieldCheck, Clock, User, CheckCircle2, Download } from 'lucide-react';
 
 export const AdminAuditLogsView: React.FC = () => {
-  const [logs] = useState([
-    { id: '1', action: 'PDF Published', details: 'NTPC CBT-1 Cut-off 2025 (RRB Patna)', user: 'Admin User', time: '29 Aug 2025, 09:32 AM', ip: '10.0.4.12' },
-    { id: '2', action: 'Notice Created', details: 'Group D Answer Key Notice', user: 'Data Admin', time: '28 Aug 2025, 04:15 PM', ip: '10.0.4.18' },
-    { id: '3', action: 'Auto Update Synced', details: '21 RRB Regional Endpoints crawled', user: 'System Worker', time: '28 Aug 2025, 11:30 PM', ip: '127.0.0.1' },
-    { id: '4', action: 'Cut-off Edited', details: 'ALP Stage-2 Normalized Marks', user: 'Admin User', time: '27 Aug 2025, 02:45 PM', ip: '10.0.4.12' },
-    { id: '5', action: 'Admin Session Login', details: 'Super Admin authenticated', user: 'admin', time: '27 Aug 2025, 09:00 AM', ip: '10.0.4.12' },
+  const [logs, setLogs] = useState([
+    {
+      id: '1',
+      action: 'Admin Session Authenticated',
+      details: 'Super Administrator logged into Dashboard',
+      user: 'admin@rrb.gov.in',
+      time: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      ip: '127.0.0.1 (Local Session)',
+    },
+    {
+      id: '2',
+      action: 'Database Initialized',
+      details: 'Clean production database initialized for live data entry',
+      user: 'System Core',
+      time: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      ip: '127.0.0.1 (System)',
+    },
   ]);
 
   return (

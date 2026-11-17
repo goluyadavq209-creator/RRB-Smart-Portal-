@@ -170,48 +170,60 @@ export const AdminCutoffView: React.FC<AdminCutoffViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {filteredCutoffs.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="py-3.5 px-4">
-                    <span className="font-mono text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 block w-max">
-                      {item.cenNumber}
-                    </span>
-                    <span className="font-bold text-slate-900 block mt-1">{item.examTitle}</span>
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span className="font-semibold text-slate-900 block">{item.postName}</span>
-                    <span className="text-[11px] text-slate-400 block">{item.stage}</span>
-                  </td>
-                  <td className="py-3.5 px-4 font-semibold text-slate-800">{item.zoneName}</td>
-                  <td className="py-3.5 px-2 text-center font-mono font-bold text-slate-900 bg-amber-50/30">
-                    {item.cutoffs.UR ?? '--'}
-                  </td>
-                  <td className="py-3.5 px-2 text-center font-mono font-bold text-slate-900 bg-amber-50/30">
-                    {item.cutoffs.OBC ?? '--'}
-                  </td>
-                  <td className="py-3.5 px-2 text-center font-mono font-bold text-slate-900 bg-amber-50/30">
-                    {item.cutoffs.SC ?? '--'}
-                  </td>
-                  <td className="py-3.5 px-2 text-center font-mono font-bold text-slate-900 bg-amber-50/30">
-                    {item.cutoffs.ST ?? '--'}
-                  </td>
-                  <td className="py-3.5 px-2 text-center font-mono font-bold text-slate-900 bg-amber-50/30">
-                    {item.cutoffs.EWS ?? '--'}
-                  </td>
-                  <td className="py-3.5 px-2 text-center font-mono font-bold text-slate-600">
-                    {item.cutoffs.ExSM ?? '--'}
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <button
-                      onClick={() => handleDelete(item.id, item.postName)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
-                      title="Delete entry"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+              {filteredCutoffs.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="py-12 text-center text-slate-400">
+                    <BarChart3 className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                    <p className="font-bold text-slate-700 text-sm">No Cut-off Marks Found</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Upload score PDFs via the PDF Pipeline or click "Add Cut-off Record" to add scores.
+                    </p>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredCutoffs.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3.5 px-4">
+                      <span className="font-mono text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 block w-max">
+                        {item.cenNumber}
+                      </span>
+                      <span className="font-bold text-slate-900 block mt-1">{item.examTitle}</span>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="font-semibold text-slate-900 block">{item.postName}</span>
+                      <span className="text-[11px] text-slate-400 block">{item.stage}</span>
+                    </td>
+                    <td className="py-3.5 px-4 font-semibold text-slate-800">{item.zoneName}</td>
+                    <td className="py-3.5 px-2 text-center font-mono font-bold text-slate-900 bg-amber-50/30">
+                      {item.cutoffs.UR ?? '--'}
+                    </td>
+                    <td className="py-3.5 px-2 text-center font-mono font-bold text-slate-900 bg-amber-50/30">
+                      {item.cutoffs.OBC ?? '--'}
+                    </td>
+                    <td className="py-3.5 px-2 text-center font-mono font-bold text-slate-900 bg-amber-50/30">
+                      {item.cutoffs.SC ?? '--'}
+                    </td>
+                    <td className="py-3.5 px-2 text-center font-mono font-bold text-slate-900 bg-amber-50/30">
+                      {item.cutoffs.ST ?? '--'}
+                    </td>
+                    <td className="py-3.5 px-2 text-center font-mono font-bold text-slate-900 bg-amber-50/30">
+                      {item.cutoffs.EWS ?? '--'}
+                    </td>
+                    <td className="py-3.5 px-2 text-center font-mono font-bold text-slate-600">
+                      {item.cutoffs.ExSM ?? '--'}
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <button
+                        onClick={() => handleDelete(item.id, item.postName)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                        title="Delete entry"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

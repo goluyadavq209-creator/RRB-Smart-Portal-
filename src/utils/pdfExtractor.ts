@@ -2,15 +2,13 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { CutoffRecord, ExamItem, NoticeItem, ResultItem, CategoryCutoffs, CutoffStage } from '../types';
 import { OFFICIAL_RRB_ZONES } from '../data/defaultData';
 
-// Configure pdfjs worker for Vite bundler
+// Configure pdfjs worker safely
 try {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.mjs',
-    import.meta.url
-  ).toString();
+  if (typeof window !== 'undefined' && pdfjsLib?.GlobalWorkerOptions) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version || '4.0.379'}/build/pdf.worker.min.mjs`;
+  }
 } catch {
-  // Fallback to unpkg CDN if worker resolution fails
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+  // Silent fallback
 }
 
 export interface ExtractedPdfData {
@@ -36,6 +34,126 @@ export interface ExtractedPdfData {
     result?: Partial<ResultItem>;
     notice?: Partial<NoticeItem>;
     exam?: Partial<ExamItem>;
+  };
+}
+
+export interface PdfRollSearchResult {
+  found: boolean;
+  searchedRoll: string;
+  matchedRoll?: string;
+  pageNumber?: number;
+  totalPages: number;
+  snippet?: string;
+  fileName: string;
+  detectedCen?: string;
+  detectedZone?: string;
+  detectedExamTitle?: string;
+  detectedStage?: string;
+  totalRollNumbersInPdf: number;
+  allFoundRollsSample: string[];
+}
+
+/**
+ * Directly search for a Roll Number across all pages of a PDF document
+ */
+export async function searchRollNumberInPdf(
+  source: File | ArrayBuffer | string,
+  fileName: string,
+  targetRoll: string,
+  onProgress?: (currentPage: number, totalPages: number) => void
+): Promise<PdfRollSearchResult> {
+  const cleanTarget = targetRoll.trim().toLowerCase().replace(/[\s\-_]/g, '');
+  if (!cleanTarget) {
+    throw new Error('Target Roll Number is required for searching in PDF.');
+  }
+
+  let loadingTask: any;
+  if (source instanceof File) {
+    const buffer = await source.arrayBuffer();
+    loadingTask = pdfjsLib.getDocument({ data: buffer });
+  } else if (source instanceof ArrayBuffer) {
+    loadingTask = pdfjsLib.getDocument({ data: source });
+  } else if (typeof source === 'string' && source.startsWith('data:')) {
+    loadingTask = pdfjsLib.getDocument({ url: source });
+  } else if (typeof source === 'string') {
+    loadingTask = pdfjsLib.getDocument({ url: source });
+  } else {
+    throw new Error('Unsupported PDF source.');
+  }
+
+  const pdfDoc = await loadingTask.promise;
+  const totalPages = pdfDoc.numPages;
+  let fullPdfText = '';
+  let found = false;
+  let matchedRoll: string | undefined;
+  let matchedPageNumber: number | undefined;
+  let matchedSnippet: string | undefined;
+  const allExtractedRolls: string[] = [];
+
+  for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+    if (onProgress) {
+      onProgress(pageNum, totalPages);
+    }
+
+    const page = await pdfDoc.getPage(pageNum);
+    const textContent = await page.getTextContent();
+    const pageText = textContent.items
+      .map((item: any) => item.str || '')
+      .join(' ');
+    
+    fullPdfText += `\n--- Page ${pageNum} ---\n` + pageText;
+
+    // Extract all candidate roll numbers on this page (10 to 16 digits typical in Railway exams)
+    const pageRollMatches = pageText.match(/\b[1-9][0-9]{8,15}\b/g) || [];
+    pageRollMatches.forEach((r: string) => {
+      if (!allExtractedRolls.includes(r)) {
+        allExtractedRolls.push(r);
+      }
+    });
+
+    if (!found) {
+      // 1. Exact match check against extracted rolls
+      const exact = pageRollMatches.find((r: string) => r.toLowerCase() === cleanTarget);
+      
+      // 2. Fallback check: Normalized text search
+      const normalizedPageText = pageText.replace(/[\s\-_]/g, '').toLowerCase();
+      const hasNormalizedMatch = normalizedPageText.includes(cleanTarget);
+
+      if (exact || hasNormalizedMatch) {
+        found = true;
+        matchedRoll = exact || targetRoll;
+        matchedPageNumber = pageNum;
+
+        // Create a readable context snippet
+        const idx = pageText.indexOf(exact || targetRoll);
+        if (idx !== -1) {
+          const start = Math.max(0, idx - 80);
+          const end = Math.min(pageText.length, idx + 120);
+          matchedSnippet = (start > 0 ? '...' : '') + pageText.substring(start, end).replace(/\s+/g, ' ') + (end < pageText.length ? '...' : '');
+        } else {
+          matchedSnippet = `Found matching roll sequence on Page ${pageNum} of ${fileName}`;
+        }
+      }
+    }
+  }
+
+  // Analyze metadata from full PDF text (CEN, Zone, Exam, Stage)
+  const analysis = analyzeRrbPdfText(fullPdfText, fileName, 0, totalPages);
+
+  return {
+    found,
+    searchedRoll: targetRoll,
+    matchedRoll: matchedRoll || targetRoll,
+    pageNumber: matchedPageNumber,
+    totalPages,
+    snippet: matchedSnippet,
+    fileName,
+    detectedCen: analysis.extractedCen || 'CEN 01/2024',
+    detectedZone: analysis.extractedZoneName || 'Regional RRB Board',
+    detectedExamTitle: analysis.extractedExamTitle || 'Railway Recruitment Examination',
+    detectedStage: analysis.extractedStage || 'Shortlisted for Next Stage',
+    totalRollNumbersInPdf: allExtractedRolls.length,
+    allFoundRollsSample: allExtractedRolls.slice(0, 100),
   };
 }
 

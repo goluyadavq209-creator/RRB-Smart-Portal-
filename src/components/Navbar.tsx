@@ -7,12 +7,12 @@ import {
   Lock, 
   Unlock, 
   ChevronDown, 
-  User,
-  Sparkles,
-  Bell,
-  HardDrive
+  User, 
+  Bell, 
+  HardDrive,
+  SearchCheck
 } from 'lucide-react';
-import { FullRRBDatabase, TabView } from '../types';
+import { FullRRBDatabase, TabView, OFFICIAL_RRB_DIGIALM_LOGIN_URL } from '../types';
 import { RailwayLogo } from './RailwayLogo';
 
 interface NavbarProps {
@@ -23,7 +23,6 @@ interface NavbarProps {
   setSelectedZoneFilter: (zone: string) => void;
   onOpenSearch: () => void;
   onOpenNotifications: () => void;
-  onOpenAIModal: () => void;
   isAdminAuthenticated: boolean;
   onAdminLogout: () => void;
 }
@@ -36,7 +35,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   setSelectedZoneFilter,
   onOpenSearch,
   onOpenNotifications,
-  onOpenAIModal,
   isAdminAuthenticated,
   onAdminLogout,
 }) => {
@@ -152,16 +150,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
 
-            {/* Answer Key with Dropdown arrow */}
+            {/* Roll Number Check Link */}
             <button
               onClick={() => {
-                setCurrentTab('notices');
+                setCurrentTab('roll-check');
                 setActiveDropdown(null);
               }}
-              className="px-3.5 py-2 rounded-full text-slate-700 hover:text-[#c1121f] hover:bg-slate-50 transition-all cursor-pointer flex items-center space-x-1"
+              className={`px-3.5 py-2 rounded-full transition-all cursor-pointer flex items-center space-x-1.5 font-bold ${
+                currentTab === 'roll-check'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200'
+              }`}
             >
-              <span>Answer Key</span>
-              <ChevronDown className="w-3.5 h-3.5" />
+              <SearchCheck className="w-3.5 h-3.5" />
+              <span>Roll Number Check</span>
             </button>
 
             {/* Notifications */}
@@ -177,15 +179,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               Notifications
-            </button>
-
-            {/* Ask AI quick nav item */}
-            <button
-              onClick={onOpenAIModal}
-              className="px-3.5 py-2 rounded-full text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all cursor-pointer flex items-center space-x-1 font-bold"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Ask AI</span>
             </button>
 
             {/* More */}
@@ -283,6 +276,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
             {[
               { id: 'home' as TabView, label: 'Home', icon: Home },
+              { id: 'roll-check' as TabView, label: 'Roll Check 🔍', badge: 'Direct' },
               { id: 'exams' as TabView, label: 'Exams & Syllabus', badge: database.exams.length },
               { id: 'cutoffs' as TabView, label: 'Cut-Off Finder', badge: database.cutoffs.length },
               { id: 'notices' as TabView, label: 'Answer Keys & Notices', badge: database.notices.length },
@@ -300,13 +294,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className={`p-3 rounded-2xl text-xs font-bold flex items-center justify-between cursor-pointer transition-all ${
                     isActive
                       ? 'bg-[#c1121f] text-white shadow-2xs'
+                      : item.id === 'roll-check'
+                      ? 'bg-blue-50 text-blue-800 border border-blue-200'
                       : 'bg-slate-50 text-slate-800 hover:bg-slate-100 border border-slate-200/80'
                   }`}
                 >
                   <span className="truncate">{item.label}</span>
                   {item.badge !== undefined && (
                     <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                      isActive 
+                        ? 'bg-white/20 text-white' 
+                        : item.id === 'roll-check'
+                        ? 'bg-blue-600 text-white font-bold'
+                        : 'bg-slate-200 text-slate-700'
                     }`}>
                       {item.badge}
                     </span>
@@ -315,18 +315,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               );
             })}
           </div>
-
-          {/* Ask AI Button in Mobile Menu */}
-          <button
-            onClick={() => {
-              setMobileMenuOpen(false);
-              onOpenAIModal();
-            }}
-            className="w-full p-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-md cursor-pointer"
-          >
-            <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>Ask RRB AI (आपका AI साथी)</span>
-          </button>
         </div>
       )}
     </header>

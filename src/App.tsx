@@ -23,14 +23,13 @@ import { ExamsSection } from './components/ExamsSection';
 import { CutoffSection } from './components/CutoffSection';
 import { NoticesSection } from './components/NoticesSection';
 import { ResultsSection } from './components/ResultsSection';
+import { RollNumberCheckPage } from './components/RollNumberCheckPage';
 import { AdminPanel } from './components/AdminPanel';
 import { AdminLogin } from './components/AdminLogin';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { NotificationToastContainer } from './components/NotificationToastContainer';
 import { NotificationCenterModal } from './components/NotificationCenterModal';
 import { MobileBottomNav } from './components/MobileBottomNav';
-import { FloatingAIAvatar } from './components/FloatingAIAvatar';
-import { RRBAIAssistantModal } from './components/RRBAIAssistantModal';
 import { RailwayLogo } from './components/RailwayLogo';
 
 export default function App() {
@@ -50,10 +49,45 @@ export default function App() {
     saveRRBDatabase(database);
   }, [database]);
 
-  // Navigate helper from search/notification modal
+  // Support direct URL hash (#admin) or query parameter (?admin) for administrator access
+  useEffect(() => {
+    const checkAdminHash = () => {
+      const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
+      if (hash === '#admin' || search.includes('admin=true') || search.includes('admin=1')) {
+        setCurrentTab('admin');
+      }
+    };
+    checkAdminHash();
+    window.addEventListener('hashchange', checkAdminHash);
+    return () => window.removeEventListener('hashchange', checkAdminHash);
+  }, []);
+
+  // Keyboard shortcut Ctrl+Shift+A or Cmd+Shift+A to toggle admin mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setCurrentTab((prev) => (prev === 'admin' ? 'home' : 'admin'));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Scroll to top whenever currentTab changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [currentTab]);
+
+  // Navigate helper to change tab and scroll to top immediately
   const handleNavigate = (tab: TabView) => {
     setCurrentTab(tab);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
   };
 
   const handleAdminLogout = () => {
@@ -62,6 +96,47 @@ export default function App() {
   };
 
   const fontSizeClass = fontSize === 'lg' ? 'text-[17px]' : fontSize === 'sm' ? 'text-[14px]' : 'text-[15px]';
+
+  if (currentTab === 'roll-check') {
+    return (
+      <div className={`min-h-screen flex flex-col font-sans ${fontSizeClass}`}>
+        <TopGovBar
+          currentLanguage={language}
+          onLanguageChange={setLanguage}
+          fontSize={fontSize}
+          onFontSizeChange={setFontSize}
+          isDarkMode={isDarkMode}
+          onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+        />
+        <RollNumberCheckPage
+          database={database}
+          onNavigateTab={handleNavigate}
+        />
+        {/* Global Universal Search Modal */}
+        <GlobalSearchModal
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          database={database}
+          onNavigate={handleNavigate}
+        />
+        {/* Real-time Notification Center Modal */}
+        <NotificationCenterModal
+          isOpen={isNotificationOpen}
+          onClose={() => setIsNotificationOpen(false)}
+          onNavigate={handleNavigate}
+          zones={database.zones}
+        />
+        {/* Floating Notifications */}
+        <NotificationToastContainer onNavigate={handleNavigate} />
+        {/* Mobile Nav */}
+        <MobileBottomNav
+          currentTab={currentTab}
+          setCurrentTab={handleNavigate}
+          onOpenSearch={() => setIsSearchOpen(true)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen bg-[#f4f6f9] flex flex-col font-sans text-slate-900 selection:bg-[#c1121f] selection:text-white ${fontSizeClass}`}>
@@ -78,13 +153,12 @@ export default function App() {
       {/* 2. Main Navigation Bar with RRB SMART PORTAL Branding */}
       <Navbar
         currentTab={currentTab}
-        setCurrentTab={setCurrentTab}
+        setCurrentTab={handleNavigate}
         database={database}
         selectedZoneFilter={selectedZoneFilter}
         setSelectedZoneFilter={setSelectedZoneFilter}
         onOpenSearch={() => setIsSearchOpen(true)}
         onOpenNotifications={() => setIsNotificationOpen(true)}
-        onOpenAIModal={() => setIsAIModalOpen(true)}
         isAdminAuthenticated={isAdminAuthenticated}
         onAdminLogout={handleAdminLogout}
       />
@@ -94,20 +168,17 @@ export default function App() {
         {currentTab === 'home' && (
           <HomeDashboard
             database={database}
-            setCurrentTab={setCurrentTab}
+            setCurrentTab={handleNavigate}
             selectedZoneFilter={selectedZoneFilter}
             setSelectedZoneFilter={setSelectedZoneFilter}
             onOpenGlobalSearch={() => setIsSearchOpen(true)}
-            isAIModalOpen={isAIModalOpen}
-            onCloseAIModal={() => setIsAIModalOpen(false)}
-            onOpenAIModal={() => setIsAIModalOpen(true)}
           />
         )}
 
         {currentTab === 'exams' && (
           <ExamsSection
             exams={database.exams}
-            setCurrentTab={setCurrentTab}
+            setCurrentTab={handleNavigate}
           />
         )}
 
@@ -116,7 +187,7 @@ export default function App() {
             database={database}
             selectedZoneFilter={selectedZoneFilter}
             setSelectedZoneFilter={setSelectedZoneFilter}
-            setCurrentTab={setCurrentTab}
+            setCurrentTab={handleNavigate}
           />
         )}
 
@@ -125,7 +196,7 @@ export default function App() {
             database={database}
             selectedZoneFilter={selectedZoneFilter}
             setSelectedZoneFilter={setSelectedZoneFilter}
-            setCurrentTab={setCurrentTab}
+            setCurrentTab={handleNavigate}
           />
         )}
 
@@ -134,7 +205,7 @@ export default function App() {
             database={database}
             selectedZoneFilter={selectedZoneFilter}
             setSelectedZoneFilter={setSelectedZoneFilter}
-            setCurrentTab={setCurrentTab}
+            setCurrentTab={handleNavigate}
           />
         )}
 
@@ -142,13 +213,13 @@ export default function App() {
           !isAdminAuthenticated ? (
             <AdminLogin
               onSuccess={() => setIsAdminAuthenticated(true)}
-              onCancel={() => setCurrentTab('home')}
+              onCancel={() => handleNavigate('home')}
             />
           ) : (
             <AdminPanel
               database={database}
               setDatabase={setDatabase}
-              setCurrentTab={setCurrentTab}
+              setCurrentTab={handleNavigate}
               onLogout={handleAdminLogout}
             />
           )
@@ -174,13 +245,11 @@ export default function App() {
       {/* Floating In-App Live Notification Toasts */}
       <NotificationToastContainer onNavigate={handleNavigate} />
 
-      {/* Floating Bottom-Right RRB AI Avatar Button */}
-      <FloatingAIAvatar onClick={() => setIsAIModalOpen(true)} />
-
-      {/* Global RRB AI Assistant Dialog */}
-      <RRBAIAssistantModal
-        isOpen={isAIModalOpen}
-        onClose={() => setIsAIModalOpen(false)}
+      {/* Mobile Bottom Navigation Bar with Answer Check Master */}
+      <MobileBottomNav
+        currentTab={currentTab}
+        setCurrentTab={handleNavigate}
+        onOpenSearch={() => setIsSearchOpen(true)}
       />
 
       {/* Official Government of India / RRB Footer */}
@@ -210,7 +279,7 @@ export default function App() {
               <ul className="space-y-2 text-xs">
                 <li>
                   <button
-                    onClick={() => setCurrentTab('exams')}
+                    onClick={() => handleNavigate('exams')}
                     className="hover:text-amber-400 transition-colors"
                   >
                     Active CEN Exams ({database.exams.length})
@@ -218,7 +287,7 @@ export default function App() {
                 </li>
                 <li>
                   <button
-                    onClick={() => setCurrentTab('cutoffs')}
+                    onClick={() => handleNavigate('cutoffs')}
                     className="hover:text-amber-400 transition-colors"
                   >
                     Cut-Off Marks Table ({database.cutoffs.length})
@@ -226,7 +295,7 @@ export default function App() {
                 </li>
                 <li>
                   <button
-                    onClick={() => setCurrentTab('notices')}
+                    onClick={() => handleNavigate('notices')}
                     className="hover:text-amber-400 transition-colors"
                   >
                     Employment Notices ({database.notices.length})
@@ -234,7 +303,7 @@ export default function App() {
                 </li>
                 <li>
                   <button
-                    onClick={() => setCurrentTab('results')}
+                    onClick={() => handleNavigate('results')}
                     className="hover:text-amber-400 transition-colors"
                   >
                     Results & Merit Panels ({database.results.length})
@@ -261,7 +330,7 @@ export default function App() {
                 <li>
                   <button
                     onClick={() => exportEmptySchemaJson()}
-                    className="hover:text-amber-400 transition-colors flex items-center space-x-1"
+                    className="hover:text-amber-400 transition-colors flex items-center space-x-1 cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Download Blank Schema (.json)</span>
@@ -269,8 +338,8 @@ export default function App() {
                 </li>
                 <li>
                   <button
-                    onClick={() => setCurrentTab('admin')}
-                    className="hover:text-amber-400 transition-colors flex items-center space-x-1"
+                    onClick={() => handleNavigate('admin')}
+                    className="hover:text-amber-400 transition-colors flex items-center space-x-1 cursor-pointer"
                   >
                     <Upload className="w-3.5 h-3.5" />
                     <span>Upload Official CEN Data</span>
@@ -278,13 +347,13 @@ export default function App() {
                 </li>
                 <li>
                   <a
-                    href="https://indianrailways.gov.in"
+                    href="https://rrb.digialm.com"
                     target="_blank"
                     rel="noreferrer"
                     className="hover:text-amber-400 transition-colors flex items-center space-x-1"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Ministry of Railways</span>
+                    <span>Centralized DigiALM Login</span>
                   </a>
                 </li>
               </ul>
@@ -294,10 +363,10 @@ export default function App() {
           {/* Bottom Copyright & Disclaimer */}
           <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-3">
             <div>
-              © {new Date().getFullYear()} RRB SMART PORTAL • Developed for official CEN record administration.
+              © {new Date().getFullYear()} RRB SMART PORTAL • Official Indian Railways Recruitment Information System.
             </div>
             <div className="text-slate-400">
-              AI-Powered Indian Railways Information Hub
+              Government of India • Ministry of Railways
             </div>
           </div>
         </div>
@@ -306,7 +375,7 @@ export default function App() {
       {/* Mobile Sticky Bottom Nav with AI button */}
       <MobileBottomNav
         currentTab={currentTab}
-        setCurrentTab={setCurrentTab}
+        setCurrentTab={handleNavigate}
         onOpenAIModal={() => setIsAIModalOpen(true)}
       />
     </div>

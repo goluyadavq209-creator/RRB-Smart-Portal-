@@ -7,45 +7,49 @@ interface AdminUsersViewProps {
 
 export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ onSuccessMessage }) => {
   const [search, setSearch] = useState('');
-
-  const users = [
+  const [users, setUsers] = useState([
     {
       id: 'u-1',
-      name: 'Super Admin',
+      name: 'Super Administrator',
       email: 'admin@rrb.gov.in',
       role: 'Super Administrator',
       roleBadge: 'bg-red-100 text-red-800 border-red-200',
       status: 'Active',
-      lastLogin: 'Today, 09:32 AM',
+      lastLogin: 'Current Session (Active)',
     },
-    {
-      id: 'u-2',
-      name: 'Patna Regional Officer',
-      email: 'officer.patna@rrb.gov.in',
-      role: 'Zone Editor (Patna)',
-      roleBadge: 'bg-blue-100 text-blue-800 border-blue-200',
+  ]);
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserRole, setNewUserRole] = useState('Data Contributor');
+
+  const handleAddUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName.trim() || !newUserEmail.trim()) return;
+
+    const newUser = {
+      id: `u-${Date.now()}`,
+      name: newUserName.trim(),
+      email: newUserEmail.trim(),
+      role: newUserRole,
+      roleBadge: newUserRole === 'Super Administrator' ? 'bg-red-100 text-red-800 border-red-200' : 'bg-blue-100 text-blue-800 border-blue-200',
       status: 'Active',
-      lastLogin: 'Yesterday, 04:15 PM',
-    },
-    {
-      id: 'u-3',
-      name: 'Kolkata Data Operator',
-      email: 'operator.kolkata@rrb.gov.in',
-      role: 'Data Contributor',
-      roleBadge: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-      status: 'Active',
-      lastLogin: '27 Aug 2025',
-    },
-    {
-      id: 'u-4',
-      name: 'Auditor User',
-      email: 'audit@railnet.gov.in',
-      role: 'Read-Only Auditor',
-      roleBadge: 'bg-slate-100 text-slate-800 border-slate-200',
-      status: 'Active',
-      lastLogin: '24 Aug 2025',
-    },
-  ];
+      lastLogin: 'Invited',
+    };
+
+    setUsers([...users, newUser]);
+    setNewUserName('');
+    setNewUserEmail('');
+    setShowAddModal(false);
+    onSuccessMessage(`User "${newUser.name}" added successfully.`);
+  };
+
+  const filteredUsers = users.filter((u) =>
+    u.name.toLowerCase().includes(search.toLowerCase()) ||
+    u.email.toLowerCase().includes(search.toLowerCase()) ||
+    u.role.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="space-y-6 animate-in fade-in">
@@ -61,13 +65,74 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ onSuccessMessage
         </div>
 
         <button
-          onClick={() => alert('Invite staff member dialog opened.')}
+          onClick={() => setShowAddModal(true)}
           className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center space-x-1.5 cursor-pointer shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>Add Admin User</span>
         </button>
       </div>
+
+      {showAddModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <h3 className="font-bold text-base text-slate-900">Add Authorized Admin / Staff</h3>
+            <form onSubmit={handleAddUser} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g., Rajesh Sharma"
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">Official Email Address</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="e.g., rajesh.sharma@rrb.gov.in"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">System Role</label>
+                <select
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl font-semibold focus:outline-none cursor-pointer"
+                >
+                  <option value="Zone Editor">Zone Editor</option>
+                  <option value="Data Contributor">Data Contributor</option>
+                  <option value="Read-Only Auditor">Read-Only Auditor</option>
+                  <option value="Super Administrator">Super Administrator</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold cursor-pointer"
+                >
+                  Save User
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
@@ -82,7 +147,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ onSuccessMessage
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {users.map((u) => (
+              {filteredUsers.map((u) => (
                 <tr key={u.id} className="hover:bg-slate-50/70">
                   <td className="py-3.5 px-4">
                     <div className="flex items-center space-x-3">
@@ -110,7 +175,7 @@ export const AdminUsersView: React.FC<AdminUsersViewProps> = ({ onSuccessMessage
                   <td className="py-3.5 px-4 text-right">
                     <button
                       onClick={() => onSuccessMessage(`Permissions updated for ${u.name}`)}
-                      className="text-xs text-blue-600 hover:underline font-bold"
+                      className="text-xs text-blue-600 hover:underline font-bold cursor-pointer"
                     >
                       Manage
                     </button>

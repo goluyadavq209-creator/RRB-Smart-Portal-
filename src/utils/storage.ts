@@ -17,15 +17,18 @@ export function loadRRBDatabase(): FullRRBDatabase {
       return INITIAL_EMPTY_DATABASE;
     }
     
-    const exams = (Array.isArray(parsed.exams) ? parsed.exams : []).map((ex) => ({
+    const exams = (Array.isArray(parsed.exams) ? parsed.exams : []).filter(Boolean).map((ex) => ({
       ...ex,
-      admitCardUrl: ex.admitCardUrl || OFFICIAL_RRB_DIGIALM_LOGIN_URL,
-      cityIntimationUrl: ex.cityIntimationUrl || OFFICIAL_RRB_DIGIALM_LOGIN_URL,
+      admitCardUrl: ex?.admitCardUrl || OFFICIAL_RRB_DIGIALM_LOGIN_URL,
+      cityIntimationUrl: ex?.cityIntimationUrl || OFFICIAL_RRB_DIGIALM_LOGIN_URL,
     }));
-    const cutoffs = Array.isArray(parsed.cutoffs) ? parsed.cutoffs : [];
-    const notices = Array.isArray(parsed.notices) ? parsed.notices : [];
-    const results = Array.isArray(parsed.results) ? parsed.results : [];
-    const portalLinks = Array.isArray(parsed.portalLinks) ? parsed.portalLinks : [];
+    const cutoffs = (Array.isArray(parsed.cutoffs) ? parsed.cutoffs : []).filter(Boolean);
+    const notices = (Array.isArray(parsed.notices) ? parsed.notices : []).filter(Boolean);
+    const results = (Array.isArray(parsed.results) ? parsed.results : []).filter(Boolean);
+    const portalLinks = (Array.isArray(parsed.portalLinks) ? parsed.portalLinks : []).filter(Boolean).map((pl) => ({
+      ...pl,
+      url: pl?.url || OFFICIAL_RRB_DIGIALM_LOGIN_URL,
+    }));
 
     return {
       metadata: parsed.metadata || INITIAL_EMPTY_DATABASE.metadata,
@@ -389,18 +392,18 @@ export function validateAndParseRRBJson(jsonString: string): ValidationResult {
       instructions: rs.instructions,
     }));
 
-    const rawPortalLinks = Array.isArray(obj.portalLinks) ? obj.portalLinks : DEFAULT_CANDIDATE_PORTAL_LINKS;
+    const rawPortalLinks = (Array.isArray(obj.portalLinks) ? obj.portalLinks : DEFAULT_CANDIDATE_PORTAL_LINKS).filter(Boolean);
     const portalLinks: CandidatePortalLink[] = rawPortalLinks.map((pl: any, idx: number) => ({
-      id: pl.id || `pl-${Date.now()}-${idx}`,
-      title: String(pl.title || 'Candidate Portal Link'),
-      examName: pl.examName ? String(pl.examName) : undefined,
-      cenNumber: pl.cenNumber ? String(pl.cenNumber) : undefined,
-      type: pl.type || 'admit_card',
-      url: String(pl.url || OFFICIAL_RRB_DIGIALM_LOGIN_URL),
-      badgeText: pl.badgeText ? String(pl.badgeText) : 'Active',
-      publishDate: pl.publishDate ? String(pl.publishDate) : new Date().toISOString().split('T')[0],
-      isActive: pl.isActive !== false,
-      notes: pl.notes ? String(pl.notes) : undefined,
+      id: pl?.id || `pl-${Date.now()}-${idx}`,
+      title: String(pl?.title || 'Candidate Portal Link'),
+      examName: pl?.examName ? String(pl.examName) : undefined,
+      cenNumber: pl?.cenNumber ? String(pl.cenNumber) : undefined,
+      type: pl?.type || 'admit_card',
+      url: String(pl?.url || OFFICIAL_RRB_DIGIALM_LOGIN_URL),
+      badgeText: pl?.badgeText ? String(pl.badgeText) : 'Active',
+      publishDate: pl?.publishDate ? String(pl.publishDate) : new Date().toISOString().split('T')[0],
+      isActive: pl?.isActive !== false,
+      notes: pl?.notes ? String(pl.notes) : undefined,
     }));
 
     const parsedData: FullRRBDatabase = {

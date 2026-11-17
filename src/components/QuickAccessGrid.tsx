@@ -5,7 +5,9 @@ import {
   TrendingUp, 
   Trophy, 
   Key, 
-  BookOpen 
+  BookOpen,
+  SearchCheck,
+  ShieldCheck
 } from 'lucide-react';
 import { FullRRBDatabase, TabView } from '../types';
 
@@ -20,6 +22,16 @@ export const QuickAccessGrid: React.FC<QuickAccessGridProps> = ({
   onOpenStudyMaterial,
 }) => {
   const cards = [
+    {
+      id: 'rollcheck',
+      title: 'Roll Number Check',
+      subtitle: 'Direct Verification',
+      icon: SearchCheck,
+      iconColor: 'text-[#2563eb]',
+      iconBg: 'bg-blue-50',
+      action: () => setCurrentTab('roll-check'),
+      badge: 'Fast',
+    },
     {
       id: 'exams',
       title: 'Latest Exams',
@@ -57,15 +69,6 @@ export const QuickAccessGrid: React.FC<QuickAccessGridProps> = ({
       action: () => setCurrentTab('results'),
     },
     {
-      id: 'answerkey',
-      title: 'Answer Key',
-      subtitle: 'Check Answer Key',
-      icon: Key,
-      iconColor: 'text-[#8b5cf6]',
-      iconBg: 'bg-purple-50',
-      action: () => setCurrentTab('notices'),
-    },
-    {
       id: 'studymaterial',
       title: 'Study Material',
       subtitle: 'Download PDFs',
@@ -97,8 +100,14 @@ export const QuickAccessGrid: React.FC<QuickAccessGridProps> = ({
             <div
               key={card.id}
               onClick={card.action}
-              className="bg-white hover:bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200/90 hover:border-slate-300 hover:shadow-md transition-all cursor-pointer flex flex-col items-center text-center justify-between group select-none"
+              className="bg-white hover:bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200/90 hover:border-slate-300 hover:shadow-md transition-all cursor-pointer flex flex-col items-center text-center justify-between group select-none relative"
             >
+              {card.badge && (
+                <span className="absolute top-2.5 right-2.5 text-[9px] font-black bg-blue-600 text-white px-1.5 py-0.2 rounded-md">
+                  {card.badge}
+                </span>
+              )}
+
               {/* Centered Colored Icon */}
               <div className={`w-12 h-12 rounded-2xl ${card.iconBg} ${card.iconColor} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-2xs`}>
                 <Icon className="w-6 h-6" />

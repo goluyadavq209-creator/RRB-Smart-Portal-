@@ -190,7 +190,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                   onNavigate('admin');
                   onClose();
                 }}
-                className="mt-3 inline-flex items-center space-x-1 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg border border-amber-200"
+                className="mt-3 inline-flex items-center space-x-1 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg border border-amber-200 cursor-pointer"
               >
                 <span>Go to Admin Panel</span>
                 <ArrowRight className="w-3.5 h-3.5" />

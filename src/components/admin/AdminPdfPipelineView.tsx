@@ -252,7 +252,7 @@ export const AdminPdfPipelineView: React.FC<AdminPdfPipelineViewProps> = ({
         badgeText: 'Cut-Off Published',
       });
     } else if (targetType === 'result') {
-      const rollNumbers = rollNumbersText ? rollNumbersText.split(/[\s,]+/).filter(Boolean) : [];
+      const rollNumbers: string[] = rollNumbersText ? Array.from(new Set(rollNumbersText.split(/[\s,]+/).filter(Boolean))) : [];
       const newResult: ResultItem = {
         id: uniqueId,
         cenNumber: cenNumber.trim() || 'CEN 01/2024',
@@ -264,8 +264,10 @@ export const AdminPdfPipelineView: React.FC<AdminPdfPipelineViewProps> = ({
         type: rollNumbers.length > 0 ? 'Merit List PDF' : 'Final Provisional Panel',
         fileUrl: pdfBase64 || pdfFile?.name,
         totalSelectedCandidates: rollNumbers.length > 0 ? rollNumbers.length : 120,
-        rollNumbersSample: rollNumbers.slice(0, 100),
+        rollNumbersSample: rollNumbers,
         instructions: instructions || `Merit list for ${cenNumber}`,
+        isNextStageEligible: true,
+        nextStageTitle: 'Next Stage Examination / Document Verification',
       };
 
       updatedDb.results = [newResult, ...updatedDb.results];

@@ -69,7 +69,7 @@ export const LatestUpdatesCard: React.FC<LatestUpdatesCardProps> = ({
       {updates.length === 0 ? (
         <div className="py-8 px-4 text-center rounded-2xl bg-slate-50 border border-dashed border-slate-200">
           <p className="text-xs font-bold text-slate-700">No updates published yet</p>
-          <p className="text-[11px] text-slate-500 mt-1">Updates and notifications will appear here once added in the Admin Panel.</p>
+          <p className="text-[11px] text-slate-500 mt-1">Latest updates and notifications will appear here upon official release.</p>
         </div>
       ) : (
         <div className="space-y-2">

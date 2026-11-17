@@ -71,19 +71,17 @@ export const ExamsSection: React.FC<ExamsSectionProps> = ({ exams, setCurrentTab
     <div className="space-y-6 pb-12">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
-        <div>
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-100">
-              <GraduationCap className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-950">
-                Centralized Employment Notifications (CEN)
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500">
-                Official Indian Railway Recruitment Board Exam directory, eligibility & vacancy criteria
-              </p>
-            </div>
+        <div className="flex items-center space-x-3">
+          <div className="p-2.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-100">
+            <GraduationCap className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-950">
+              Centralized Employment Notifications (CEN)
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500">
+              Official Indian Railway Recruitment Board Exam directory, eligibility & vacancy criteria
+            </p>
           </div>
         </div>
 
@@ -162,18 +160,18 @@ export const ExamsSection: React.FC<ExamsSectionProps> = ({ exams, setCurrentTab
             <GraduationCap className="w-7 h-7" />
           </div>
           <h3 className="font-bold text-base sm:text-lg text-slate-900">
-            {exams.length === 0 ? 'No RRB Exams Uploaded Yet' : 'No Matching Exams Found'}
+            {exams.length === 0 ? 'No Active RRB Exams at this moment' : 'No Matching Exams Found'}
           </h3>
           <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1">
             {exams.length === 0
-              ? 'In accordance with the zero fabricated data policy, you can upload real CEN exam data via JSON or add items manually in Admin Panel.'
+              ? 'Centralized employment notifications will appear here once officially published by the Railway Recruitment Board.'
               : 'Try adjusting your search criteria or resetting filters.'}
           </p>
 
-          <div className="mt-5 flex justify-center gap-3">
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
             <button
               onClick={() => setCurrentTab('admin')}
-              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm transition-all cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-xs"
             >
               Open Admin Panel
             </button>

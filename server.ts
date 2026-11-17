@@ -9,7 +9,8 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 // Lazy-initialize Gemini AI client
 let aiClient: GoogleGenAI | null = null;
@@ -146,7 +147,7 @@ app.post('/api/gemini/chat', async (req, res) => {
     contents.push({ role: 'user', parts: [{ text: contextualPrompt }] });
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-2.5-flash',
       contents: contents,
       config: {
         systemInstruction: RRB_KNOWLEDGE_SYSTEM_PROMPT,
@@ -159,12 +160,15 @@ app.post('/api/gemini/chat', async (req, res) => {
     return res.json({
       reply: replyText,
       success: true,
+      fallbackNeeded: false,
     });
   } catch (error: any) {
-    console.error('Gemini API error in server.ts:', error);
-    return res.status(500).json({
-      error: error.message || 'Internal server error while contacting Gemini AI',
+    console.warn('Gemini API notice in server.ts (falling back to local engine):', error.message || error);
+    // Return 200 with fallback flag so frontend gracefully uses the local intelligent RRB AI
+    return res.json({
+      reply: null,
       fallbackNeeded: true,
+      error: error.message || 'Gemini API limit or error',
     });
   }
 });

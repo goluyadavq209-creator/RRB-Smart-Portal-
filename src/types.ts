@@ -120,6 +120,8 @@ export interface ResultItem {
   totalSelectedCandidates?: number;
   rollNumbersSample?: string[];
   instructions?: string;
+  isNextStageEligible?: boolean;
+  nextStageTitle?: string;
 }
 
 export type PortalLinkType = 
@@ -157,4 +159,4 @@ export interface FullRRBDatabase {
   portalLinks?: CandidatePortalLink[];
 }
 
-export type TabView = 'home' | 'exams' | 'cutoffs' | 'notices' | 'results' | 'admin';
+export type TabView = 'home' | 'roll-check' | 'exams' | 'cutoffs' | 'notices' | 'results' | 'admin';

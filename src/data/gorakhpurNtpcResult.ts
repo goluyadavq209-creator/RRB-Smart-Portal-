@@ -243,4 +243,6 @@ export const GORAKHPUR_CEN_06_2025_RESULT: ResultItem = {
   totalSelectedCandidates: 828,
   rollNumbersSample: GORAKHPUR_CEN_06_2025_ROLL_NUMBERS,
   instructions: '2nd Stage CBT was conducted on 10 July 2026. 828 candidates shortlisted for CBAT/CBTST scheduled tentatively in September 2026. Individual scorecards live from 27.08.2026 at 17:00 hrs. All 828 roll numbers are arranged horizontally in ascending order.',
+  isNextStageEligible: true,
+  nextStageTitle: 'CBAT & CBTST Aptitude Test (September 2026)',
 };

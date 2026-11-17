@@ -121,7 +121,7 @@ export const CutOffTablePreview: React.FC<CutOffTablePreviewProps> = ({
                     </div>
                     <p className="font-semibold text-slate-700 text-xs sm:text-sm">
                       {database.cutoffs.length === 0
-                        ? 'Official data will appear here after admin verification.'
+                        ? 'Official cut-off data will appear here once declared.'
                         : 'No cut-off records matched the selected filter criteria.'}
                     </p>
                     <p className="text-[11px] text-slate-400 leading-relaxed">

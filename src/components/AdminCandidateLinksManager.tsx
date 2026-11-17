@@ -75,15 +75,16 @@ export const AdminCandidateLinksManager: React.FC<AdminCandidateLinksManagerProp
   };
 
   const handleStartEdit = (link: CandidatePortalLink) => {
+    if (!link) return;
     setEditingLinkId(link.id);
     setFormData({
-      title: link.title,
+      title: link.title || '',
       examName: link.examName || '',
       cenNumber: link.cenNumber || '',
-      type: link.type,
-      url: link.url,
+      type: link.type || 'admit_card',
+      url: link.url || '',
       badgeText: link.badgeText || 'Active Now',
-      isActive: link.isActive,
+      isActive: link.isActive !== false,
       notes: link.notes || '',
     });
     setShowAddForm(true);

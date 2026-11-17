@@ -302,21 +302,34 @@ export const CutoffSection: React.FC<CutoffSectionProps> = ({
             <BarChart3 className="w-7 h-7" />
           </div>
           <h3 className="font-bold text-base sm:text-lg text-slate-900">
-            {database.cutoffs.length === 0 ? 'Zero Cut-Off Records Uploaded' : 'No Cut-Offs Match Your Filters'}
+            {database.cutoffs.length === 0 ? 'No Cut-Off Marks Available Currently' : 'No Cut-Offs Match Your Filters'}
           </h3>
           <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1">
             {database.cutoffs.length === 0
-              ? 'No fake data is injected. Upload your official RRB cut-off JSON data in the Admin Panel to populate this interactive table.'
+              ? 'Official post-wise and category-wise cut-off scores will be listed here once declared by RRB.'
               : 'Try clearing the search query or selecting "All Regional Boards".'}
           </p>
 
-          <div className="mt-5 flex justify-center gap-3">
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
             <button
               onClick={() => setCurrentTab('admin')}
               className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-xs"
             >
               Go to Admin Panel & Upload JSON
             </button>
+            {(searchQuery || selectedZoneFilter !== 'ALL' || selectedCenFilter !== 'ALL' || selectedStageFilter !== 'ALL') && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedZoneFilter('ALL');
+                  setSelectedCenFilter('ALL');
+                  setSelectedStageFilter('ALL');
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm transition-all cursor-pointer"
+              >
+                Clear All Filters
+              </button>
+            )}
           </div>
         </div>
       ) : (

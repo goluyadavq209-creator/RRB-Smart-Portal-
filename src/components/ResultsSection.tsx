@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { FullRRBDatabase, ResultItem, ResultType, TabView } from '../types';
 import { PdfViewerModal } from './PdfViewerModal';
+import { DirectRollNumberVerifier } from './DirectRollNumberVerifier';
 
 interface ResultsSectionProps {
   database: FullRRBDatabase;
@@ -166,132 +167,15 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
         </button>
       </div>
 
-      {/* Roll Number Shortlist Checker Tool */}
-      <div className="bg-slate-900 rounded-2xl p-5 sm:p-6 text-white border border-slate-800 shadow-xs">
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <div className="flex items-center space-x-2 text-amber-400 font-bold text-sm">
-            <SearchCode className="w-4 h-4" />
-            <span>Direct Roll Number Verification Tool</span>
-          </div>
-          <span className="text-[11px] font-semibold text-yellow-300 bg-yellow-950/80 border border-yellow-500/50 px-2.5 py-0.5 rounded-full flex items-center space-x-1">
-            <Sun className="w-3 h-3 text-yellow-400" />
-            <span>Morning Sun Highlight Active</span>
-          </span>
-        </div>
-        <p className="text-xs text-slate-300 mb-4 max-w-2xl">
-          Check if your RRB roll number has been shortlisted. Matching numbers will be highlighted in bright morning sunlight golden color.
-        </p>
-
-        <form onSubmit={handleRollSearch} className="flex flex-col sm:flex-row gap-2 max-w-xl">
-          <input
-            type="text"
-            value={rollNumberQuery}
-            onChange={(e) => {
-              setRollNumberQuery(e.target.value);
-              if (rollSearchResult.searched) {
-                setRollSearchResult({ searched: false, foundIn: [] });
-              }
-            }}
-            placeholder="Enter your Roll Number (e.g. 191191190234561)..."
-            className="flex-1 bg-slate-800/90 border border-slate-700 rounded-xl px-4 py-2 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
-          />
-          <button
-            type="submit"
-            className="px-5 py-2 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-bold text-xs sm:text-sm rounded-xl transition-all shadow-xs cursor-pointer flex items-center justify-center space-x-1.5"
-          >
-            <Search className="w-4 h-4" />
-            <span>Check Status</span>
-          </button>
-        </form>
-
-        {/* Verification Result Feedback */}
-        {rollSearchResult.searched && (
-          <div className="mt-4 pt-4 border-t border-slate-800 animate-in fade-in">
-            {rollSearchResult.foundIn.length > 0 ? (
-              <div className="p-4 rounded-xl bg-emerald-950/70 border border-emerald-500/50 text-emerald-200 text-xs sm:text-sm space-y-3">
-                <div className="flex items-center space-x-2 font-bold text-emerald-300 text-sm">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                  <span>Congratulations! Roll Number Found in Shortlist Panel</span>
-                </div>
-
-                {rollSearchResult.foundIn.map(({ result, roll }, i) => (
-                  <div key={i} className="p-3 bg-slate-900/90 rounded-xl border border-slate-700/80 text-xs space-y-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="text-white font-semibold">
-                        <strong>Exam:</strong> {result.examTitle} ({result.cenNumber})
-                      </div>
-                      <span className="text-[11px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
-                        {result.publishDate}
-                      </span>
-                    </div>
-
-                    <div className="text-slate-300">
-                      <strong>Board:</strong> {result.zoneName} • <strong>Stage:</strong> {result.stage} • <strong>Type:</strong> {result.type}
-                    </div>
-
-                    {/* Matched Number Highlighted in Morning Golden Yellow */}
-                    <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-slate-400 text-xs">Matched Shortlist Number:</span>
-                        <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-yellow-300 via-amber-300 to-yellow-400 text-slate-950 font-mono font-extrabold border-2 border-yellow-500 shadow-md ring-2 ring-yellow-400/50 animate-pulse">
-                          <Sun className="w-4 h-4 text-amber-900" />
-                          <span>{renderHighlightedText(roll, rollNumberQuery)}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(roll)}
-                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[11px] font-medium flex items-center space-x-1 transition-colors cursor-pointer"
-                        >
-                          {copiedRoll === roll ? (
-                            <>
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
-                              <span className="text-emerald-400">Copied</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3.5 h-3.5" />
-                              <span>Copy Number</span>
-                            </>
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveRollModalResult(result)}
-                          className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-[11px] font-medium flex items-center space-x-1 transition-colors cursor-pointer"
-                        >
-                          <ListFilter className="w-3.5 h-3.5" />
-                          <span>View Full Panel</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {result.instructions && (
-                      <p className="text-slate-300 text-[11px] mt-1 bg-slate-950/60 p-2 rounded">
-                        {result.instructions}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 text-xs flex items-center space-x-3">
-                <XCircle className="w-5 h-5 text-amber-400 shrink-0" />
-                <div>
-                  <div className="font-semibold text-white">
-                    Roll Number "{rollNumberQuery}" not found in current loaded panels.
-                  </div>
-                  <p className="text-slate-400 text-[11px] mt-0.5">
-                    Ensure the correct RRB panel is selected or check all regional boards.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Direct Roll Number Verification Tool */}
+      <DirectRollNumberVerifier
+        database={database}
+        onOpenFullPanelModal={(res) => {
+          setActiveRollModalResult(res);
+          setRollModalSearch('');
+        }}
+        setCurrentTab={setCurrentTab}
+      />
 
       {/* Filter and Search Bar */}
       <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
@@ -350,21 +234,33 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
             <Award className="w-7 h-7" />
           </div>
           <h3 className="font-bold text-base sm:text-lg text-slate-900">
-            {database.results.length === 0 ? 'Zero Results Uploaded' : 'No Results Found For This Filter'}
+            {database.results.length === 0 ? 'No Results or Provisional Panels Declared Yet' : 'No Results Found For This Filter'}
           </h3>
           <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1">
             {database.results.length === 0
-              ? 'No fake scorecards are loaded. Upload your official RRB merit panels via JSON or PDF in Admin Panel.'
+              ? 'Official provisional panels, document verification lists, and merit lists will be published here upon official release.'
               : 'Try clearing your search query or selecting "All Results".'}
           </p>
 
-          <div className="mt-5 flex justify-center gap-3">
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
             <button
               onClick={() => setCurrentTab('admin')}
               className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-xs"
             >
               Open Admin Panel
             </button>
+            {(searchQuery || selectedType !== 'ALL' || selectedZoneFilter !== 'ALL') && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedType('ALL');
+                  setSelectedZoneFilter('ALL');
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm transition-all cursor-pointer"
+              >
+                Reset Filters
+              </button>
+            )}
           </div>
         </div>
       ) : (

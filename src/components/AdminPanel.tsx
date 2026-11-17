@@ -48,6 +48,7 @@ import { AdminSettingsView } from './admin/AdminSettingsView';
 import { AdminRolesView } from './admin/AdminRolesView';
 import { AdminAuditLogsView } from './admin/AdminAuditLogsView';
 import { AdminBackupView } from './admin/AdminBackupView';
+import { AdminRollNumbersView } from './admin/AdminRollNumbersView';
 
 export type AdminMenuTab = 
   | 'dashboard'
@@ -55,6 +56,7 @@ export type AdminMenuTab =
   | 'exams'
   | 'cen'
   | 'cutoffs'
+  | 'roll_numbers'
   | 'pdf_pipeline'
   | 'notices'
   | 'auto_update'
@@ -97,13 +99,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     else setCurrentTab('home');
   };
 
-  // 17 Navigation Items exactly matching the reference specification
+  // Navigation Items matching the reference specification
   const navItems: { id: AdminMenuTab; label: string; icon: any }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'zones', label: 'RRB Zones', icon: Building2 },
     { id: 'exams', label: 'Exams Management', icon: FileText },
     { id: 'cen', label: 'CEN Management', icon: Tag },
     { id: 'cutoffs', label: 'Cut-off Management', icon: BarChart3 },
+    { id: 'roll_numbers', label: 'Roll Numbers & Merit Lists', icon: Layers },
     { id: 'pdf_pipeline', label: 'PDF / Document Manager', icon: FileUp },
     { id: 'notices', label: 'Official Notices', icon: Bell },
     { id: 'auto_update', label: 'Automatic Data Update', icon: RefreshCw },
@@ -347,6 +350,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               setDatabase={setDatabase}
               onSuccessMessage={showToast}
               onOpenPdfPipeline={() => setActiveTab('pdf_pipeline')}
+            />
+          )}
+
+          {activeTab === 'roll_numbers' && (
+            <AdminRollNumbersView
+              database={database}
+              setDatabase={setDatabase}
+              onSuccessMessage={showToast}
             />
           )}
 

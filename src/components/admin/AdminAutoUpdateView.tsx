@@ -63,11 +63,12 @@ export const AdminAutoUpdateView: React.FC<AdminAutoUpdateViewProps> = ({ databa
 
     let i = 0;
     const interval = setInterval(() => {
-      if (i < boards.length) {
-        setCurrentCheckingBoard(`Scanning ${boards[i].name} (${boards[i].url})...`);
+      if (i < boards.length && boards[i]) {
+        const currentBoard = boards[i];
+        setCurrentCheckingBoard(`Scanning ${currentBoard.name} (${currentBoard.url})...`);
         setScanProgress((prev) => Math.min(prev + 9, 92));
         setLogs((prev) => [
-          `[${new Date().toLocaleTimeString()}] [FETCH] ${boards[i].url} -> Index scanned: All active notices & cut-offs verified.`,
+          `[${new Date().toLocaleTimeString()}] [FETCH] ${currentBoard.url} -> Index scanned: All active notices & cut-offs verified.`,
           ...prev,
         ]);
         i++;

@@ -117,58 +117,75 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({ database, setDat
       </div>
 
       {/* Exams Table / Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredExams.map((exam) => (
-          <div
-            key={exam.id}
-            className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all space-y-3"
+      {filteredExams.length === 0 ? (
+        <div className="bg-white p-12 rounded-2xl border border-slate-200 shadow-xs text-center space-y-3">
+          <Layers className="w-9 h-9 text-slate-300 mx-auto" />
+          <h3 className="font-bold text-slate-800 text-sm">No Recruitment Exams Found</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            Your database is currently empty and clean. Click "Add New Exam" to register an official CEN recruitment.
+          </p>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-xs inline-flex items-center space-x-1.5 cursor-pointer mt-2"
           >
-            <div className="flex items-center justify-between">
-              <span className="px-2.5 py-1 rounded-md bg-amber-500/15 text-amber-900 border border-amber-500/30 text-xs font-bold font-mono">
-                {exam.cenNumber}
-              </span>
-              <span
-                className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                  exam.status === 'Active Application'
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : exam.status === 'Exam Underway'
-                    ? 'bg-blue-100 text-blue-800'
-                    : 'bg-slate-100 text-slate-700'
-                }`}
-              >
-                {exam.status}
-              </span>
-            </div>
-
-            <div>
-              <h3 className="font-extrabold text-base text-slate-900">{exam.title}</h3>
-              <p className="text-xs text-slate-500 mt-0.5">{exam.department} • {exam.payScale}</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <div>
-                <span className="text-slate-400 block text-[10px]">Total Vacancies</span>
-                <span className="font-bold text-slate-900">{exam.totalVacancies?.toLocaleString() || 'N/A'} Posts</span>
+            <Plus className="w-4 h-4" />
+            <span>Add First Exam</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredExams.map((exam) => (
+            <div
+              key={exam.id}
+              className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <span className="px-2.5 py-1 rounded-md bg-amber-500/15 text-amber-900 border border-amber-500/30 text-xs font-bold font-mono">
+                  {exam.cenNumber}
+                </span>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                    exam.status === 'Active Application'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : exam.status === 'Exam Underway'
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  {exam.status}
+                </span>
               </div>
+
               <div>
-                <span className="text-slate-400 block text-[10px]">Eligibility</span>
-                <span className="font-semibold text-slate-800 truncate block">{exam.eligibility || 'Graduate'}</span>
+                <h3 className="font-extrabold text-base text-slate-900">{exam.title}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{exam.department} • {exam.payScale}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <div>
+                  <span className="text-slate-400 block text-[10px]">Total Vacancies</span>
+                  <span className="font-bold text-slate-900">{exam.totalVacancies?.toLocaleString() || 'N/A'} Posts</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[10px]">Eligibility</span>
+                  <span className="font-semibold text-slate-800 truncate block">{exam.eligibility || 'Graduate'}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                <span className="text-slate-400">Stages: {exam.selectionStages?.join(' → ')}</span>
+                <button
+                  onClick={() => handleDelete(exam.id, exam.title)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                  title="Delete exam"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             </div>
-
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-              <span className="text-slate-400">Stages: {exam.selectionStages?.join(' → ')}</span>
-              <button
-                onClick={() => handleDelete(exam.id, exam.title)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                title="Delete exam"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Add Exam Modal */}
       {showAddModal && (
